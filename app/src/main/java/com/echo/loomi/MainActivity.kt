@@ -1,5 +1,6 @@
 package com.echo.loomi
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,14 +15,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ValueEventListener
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,14 +43,72 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.echo.loomi.ui.theme.LoomiTheme
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        val auth = FirebaseAuth.getInstance()
+        val prefs = getSharedPreferences("echo_prefs", MODE_PRIVATE)
+        
+        // 1. Check if user is logged in
+        if (auth.currentUser == null) {
+            val intent = Intent(this, LoginActivity::class.java)
+            startActivity(intent)
+            finish()
+            return
+        }
+        
+        // 2. Check if profile setup is done locally
+        if (!prefs.getBoolean("profile_done", false)) {
+            // Verify with Firebase in case prefs were cleared
+            val db = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+            db.child("users").child(auth.currentUser!!.uid).child("imageName").get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot.exists()) {
+                        prefs.edit().putBoolean("profile_done", true).apply()
+                        // Continue to UI
+                        startApp()
+                    } else {
+                        val intent = Intent(this, WelcomeActivity::class.java)
+                        startActivity(intent)
+                        finish()
+                    }
+                }
+                .addOnFailureListener {
+                    val intent = Intent(this, WelcomeActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                }
+        } else {
+            startApp()
+        }
+    }
+
+    private fun startApp() {
         enableEdgeToEdge()
         setContent {
             LoomiTheme {
-                SnapStyleScreen()
+                SnapStyleScreen(
+                    onLogout = {
+                        val auth = FirebaseAuth.getInstance()
+                        val uid = auth.currentUser?.uid
+                        if (uid != null) {
+                            val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+                            database.child("users").child(uid).child("status").setValue("Offline")
+                            database.child("users").child(uid).child("lastSeen").setValue(ServerValue.TIMESTAMP)
+                        }
+                        auth.signOut()
+                        getSharedPreferences("echo_prefs", MODE_PRIVATE).edit().clear().apply()
+                        
+                        val intent = Intent(this, LoginActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(intent)
+                        finish()
+                    }
+                )
             }
         }
     }
@@ -54,38 +116,94 @@ class MainActivity : ComponentActivity() {
 
 @Immutable
 data class SnapUser(
+    val uid: String,
     val name: String,
-    val status: String,
-    val time: String,
+    val status: String = "Offline",
+    val lastSeen: Long = 0,
     val isPinned: Boolean = false,
     val imageName: String
 )
 
+fun formatLastSeen(lastSeen: Long): String {
+    if (lastSeen <= 0) return "Never"
+    val now = System.currentTimeMillis()
+    val diff = now - lastSeen
+    
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+    val hours = TimeUnit.MILLISECONDS.toHours(diff)
+    val days = TimeUnit.MILLISECONDS.toDays(diff)
+
+    return when {
+        minutes < 1 -> "Just now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        else -> "${days}d ago"
+    }
+}
+
 @Composable
-fun SnapStyleScreen() {
-    val users = remember {
-        listOf(
-            SnapUser("Hema Kutty", "Delivered", "8m", true, "Ellipse 7.png"),
-            SnapUser("Cute _girl🥰", "Delivered", "8m", true, "Ellipse 112.png"),
-            SnapUser("My Lover 😘", "Received", "1d", true, "Ellipse 47.png"),
-            SnapUser("Priya Chlo 😚", "Delivered", "5m", false, "Ellipse 81.png"),
-            SnapUser("Sneha", "Received", "10m", false, "Ellipse 1.png"),
-            SnapUser("Anjali ✨", "Delivered", "15m", false, "Ellipse 2.png"),
-            SnapUser("Rahul", "Received", "1h", false, "Ellipse 3.png"),
-            SnapUser("Pooja 🌸", "Delivered", "2h", false, "Ellipse 4.png"),
-            SnapUser("Vikram", "Opened", "3h", false, "Ellipse 5.png"),
-            SnapUser("Kavya", "Received", "5h", false, "Ellipse 6.png"),
-            SnapUser("Arjun", "Delivered", "6h", false, "Ellipse 9.png"),
-            SnapUser("Deepa 💎", "Opened", "7h", false, "Ellipse 10.png"),
-            SnapUser("Suresh", "Received", "12h", false, "Ellipse 11.png"),
-            SnapUser("Meera", "Delivered", "1d", false, "Ellipse 12.png"),
-            SnapUser("Amit", "Opened", "2d", false, "Ellipse 13.png"),
-            SnapUser("Swati 🦋", "Received", "3d", false, "Ellipse 14.png"),
-            SnapUser("Karan", "Delivered", "4d", false, "Ellipse 15.png"),
-            SnapUser("Neha 🌈", "Opened", "5d", false, "Ellipse 16.png"),
-            SnapUser("Vijay", "Received", "1w", false, "Ellipse 17.png"),
-            SnapUser("Divya", "Delivered", "1w", false, "Ellipse 18.png")
-        )
+fun SnapStyleScreen(onLogout: () -> Unit) {
+    val usersList = remember { mutableStateListOf<SnapUser>() }
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    var currentUserImage by remember { mutableStateOf("Ellipse 1.png") }
+
+    LaunchedEffect(Unit) {
+        val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+        val uid = currentUser?.uid ?: return@LaunchedEffect
+
+        // Presence System
+        val userStatusRef = database.child("users").child(uid).child("status")
+        val lastSeenRef = database.child("users").child(uid).child("lastSeen")
+        val connectedRef = database.child(".info/connected")
+
+        connectedRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val connected = snapshot.getValue(Boolean::class.java) ?: false
+                if (connected) {
+                    userStatusRef.setValue("Online")
+                    userStatusRef.onDisconnect().setValue("Offline")
+                    lastSeenRef.onDisconnect().setValue(ServerValue.TIMESTAMP)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
+        // Fetch current user image
+        database.child("users").child(uid).child("imageName")
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    currentUserImage = snapshot.getValue(String::class.java) ?: "Ellipse 1.png"
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+
+        // Fetch other users
+        database.child("users").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                usersList.clear()
+                for (userSnapshot in snapshot.children) {
+                    val otherUid = userSnapshot.child("uid").getValue(String::class.java) ?: ""
+                    if (otherUid != uid) {
+                        val name = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
+                        val imageName = userSnapshot.child("imageName").getValue(String::class.java) ?: "Ellipse 1.png"
+                        val status = userSnapshot.child("status").getValue(String::class.java) ?: "Offline"
+                        val lastSeen = userSnapshot.child("lastSeen").getValue(Long::class.java) ?: 0L
+                        
+                        usersList.add(SnapUser(
+                            uid = otherUid,
+                            name = name, 
+                            imageName = imageName,
+                            status = status,
+                            lastSeen = lastSeen
+                        ))
+                    }
+                }
+                // Sort online users to top
+                usersList.sortByDescending { it.status == "Online" }
+            }
+
+            override fun onCancelled(error: DatabaseError) {}
+        })
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -116,9 +234,11 @@ fun SnapStyleScreen() {
                             color = Color.Transparent
                         ) {
                             val context = LocalContext.current
-                            val profileRequest = remember {
+                            val profileRequest = remember(currentUserImage) {
                                 ImageRequest.Builder(context)
-                                    .data("file:///android_asset/user/Ellipse 139.png")
+                                    .data("file:///android_asset/user/$currentUserImage")
+                                    .placeholder(android.R.drawable.ic_menu_report_image)
+                                    .error(android.R.drawable.ic_menu_report_image)
                                     .size(120, 120)
                                     .build()
                             }
@@ -143,6 +263,9 @@ fun SnapStyleScreen() {
                             modifier = Modifier.align(Alignment.CenterEnd),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            IconButton(onClick = onLogout) {
+                                Icon(Icons.Default.PushPin, contentDescription = "Logout", tint = Color.Black)
+                            }
                             Spacer(modifier = Modifier.width(12.dp))
                             Box(contentAlignment = Alignment.TopEnd) {
                                 Surface(
@@ -163,15 +286,15 @@ fun SnapStyleScreen() {
                     contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
                     items(
-                        items = users,
-                        key = { it.name + it.imageName },
+                        items = usersList,
+                        key = { it.uid },
                         contentType = { "chat_item" }
                     ) { user ->
                         SnapChatItem(user)
                     }
                 }
 
-                // Smooth Bottom Fade Overlay (Optimized: No BlendMode/Offscreen)
+                // Smooth Bottom Fade Overlay
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -197,31 +320,11 @@ fun SnapStyleScreen() {
 }
 
 @Composable
-fun SnapTab(text: String, count: String? = null, isSelected: Boolean) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = if (isSelected) Color.Black else Color(0xFFF7F7F7),
-        modifier = Modifier.height(34.dp)
-    ) {
-        Row(modifier = Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text, color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            count?.let {
-                Spacer(modifier = Modifier.width(6.dp))
-                Box(modifier = Modifier.size(18.dp).clip(CircleShape).background(if (isSelected) Color.White else Color.Black), contentAlignment = Alignment.Center) {
-                    Text(it, color = if (isSelected) Color.Black else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun SnapChatItem(user: SnapUser) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .drawBehind {
-                // Drawing the divider directly to improve performance (reduces layout nodes)
                 val strokeWidth = 0.5.dp.toPx()
                 val y = size.height - strokeWidth / 2
                 drawLine(
@@ -234,7 +337,7 @@ fun SnapChatItem(user: SnapUser) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // User Icon (Outline style like Snap) - Optimized with Box instead of Surface
+        // User Icon
         Box(
             modifier = Modifier
                 .size(54.dp)
@@ -247,7 +350,9 @@ fun SnapChatItem(user: SnapUser) {
                 ImageRequest.Builder(context)
                     .data("file:///android_asset/user/${user.imageName}")
                     .crossfade(true)
-                    .size(150, 150) // Hardware-accelerated downsizing for assets
+                    .placeholder(android.R.drawable.ic_menu_report_image)
+                    .error(android.R.drawable.ic_menu_report_image)
+                    .size(150, 150)
                     .build()
             }
             AsyncImage(
@@ -258,6 +363,17 @@ fun SnapChatItem(user: SnapUser) {
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
+            
+            // Online status dot
+            if (user.status == "Online") {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .align(Alignment.BottomEnd)
+                        .background(Color.Green, CircleShape)
+                        .border(2.dp, Color.White, CircleShape)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -265,26 +381,16 @@ fun SnapChatItem(user: SnapUser) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = user.name, fontSize = 17.sp, fontWeight = FontWeight.Normal)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // The status icon style
-                val statusIcon = when (user.status) {
-                    "Delivered" -> "➤"
-                    "Received" -> "☐"
-                    "Opened" -> "▻"
-                    else -> "➤"
-                }
-                val statusColor = when (user.status) {
-                    "Delivered" -> Color(0xFF00B0FF) // Blue
-                    "Received" -> Color.Red
-                    "Opened" -> Color.Red
-                    else -> Color.Gray
-                }
+                val statusText = if (user.status == "Online") "Online" else formatLastSeen(user.lastSeen)
+                val statusColor = if (user.status == "Online") Color(0xFF66BB6A) else Color.Gray
+                
                 Text(
-                    text = statusIcon,
+                    text = if (user.status == "Online") "● " else "➤ ",
                     color = statusColor,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(end = 4.dp)
                 )
-                Text(text = "${user.status} • ${user.time}", color = Color.Gray, fontSize = 13.sp)
+                Text(text = statusText, color = Color.Gray, fontSize = 13.sp)
             }
         }
     }
@@ -297,11 +403,9 @@ fun FloatingBottomNavBar(
 ) {
     Box(
         modifier = modifier
-            .zIndex(1f) // THIS FORCES IT TO THE VERY FRONT
+            .zIndex(1f)
             .clip(RoundedCornerShape(30.dp))
-            // The "Liquid Glass" translucent background (50% solid so it's clearly visible)
             .background(Color(0xFFFFF2D9).copy(alpha = 200f))
-            // The subtle shiny glass edge
             .border(
                 width = 2.dp,
                 color = Color(0xFFFFFFFF).copy(alpha = 3000f),
@@ -320,7 +424,7 @@ fun FloatingBottomNavBar(
                 Icon(
                     imageVector = Icons.Outlined.PhotoCamera,
                     contentDescription = "Camera",
-                    tint = Color.Black, // Icons are pure black and sharp now
+                    tint = Color.Black,
                     modifier = Modifier.size(20.dp)
                 )
             }

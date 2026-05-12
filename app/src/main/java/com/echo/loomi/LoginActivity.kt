@@ -1,7 +1,6 @@
 package com.echo.loomi
 
 import android.content.Intent
-import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,13 +33,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.echo.loomi.ui.theme.LoomiTheme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.delay
 
 class LoginActivity : ComponentActivity() {
 
-    private lateinit var prefs: SharedPreferences
     private lateinit var googleAuthClient: GoogleAuthClient
-
     private var isLoading = mutableStateOf(false)
     private var errorMessage = mutableStateOf("")
 
@@ -48,17 +47,9 @@ class LoginActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        prefs = getSharedPreferences("echo_prefs", MODE_PRIVATE)
-
-        if (prefs.getBoolean("logged_in", false)) {
-            navigateToAi()
-            return
-        }
-
         googleAuthClient = GoogleAuthClient(this) { success ->
             if (success) {
-                prefs.edit().putBoolean("logged_in", true).apply()
-                navigateToAi()
+                checkProfileAndNavigate()
             } else {
                 isLoading.value = false
                 errorMessage.value = "Sign in failed. Please try again."
@@ -83,7 +74,29 @@ class LoginActivity : ComponentActivity() {
         }
     }
 
-    private fun navigateToAi() {
+    private fun checkProfileAndNavigate() {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+        
+        database.child("users").child(user.uid).child("imageName").get().addOnCompleteListener { task ->
+            if (task.isSuccessful && task.result.exists()) {
+                val prefs = getSharedPreferences("echo_prefs", MODE_PRIVATE)
+                prefs.edit().putBoolean("profile_done", true).apply()
+                navigateToMain()
+            } else {
+                navigateToWelcome()
+            }
+        }
+    }
+
+    private fun navigateToWelcome() {
+        val intent = Intent(this, WelcomeActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun navigateToMain() {
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
