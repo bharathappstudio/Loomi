@@ -3,7 +3,6 @@ package com.echo.loomi
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.Context
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
@@ -16,8 +15,6 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.database.FirebaseDatabase
-import org.json.JSONArray
-import org.json.JSONObject
 
 class GoogleAuthClient(
     private val activity: ComponentActivity,
@@ -73,7 +70,6 @@ class GoogleAuthClient(
         val uid = user.uid
         val name = user.displayName ?: "Anonymous"
         val email = user.email ?: ""
-        val photoUrl = user.photoUrl?.toString() ?: ""
 
         val updates = mapOf(
             "uid" to uid,
@@ -85,42 +81,12 @@ class GoogleAuthClient(
         database.child("users").child(uid).updateChildren(updates)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    saveAccountLocally(uid, name, email, photoUrl)
                     Log.d("AUTH_LOG", "User data updated")
                 }
                 onResult(true)
             }
     }
 
-    private fun saveAccountLocally(uid: String, name: String, email: String, photoUrl: String) {
-        val prefs = activity.getSharedPreferences("echo_accounts", Context.MODE_PRIVATE)
-        val accountsJson = prefs.getString("accounts_list", "[]") ?: "[]"
-        val accountsArray = JSONArray(accountsJson)
-        
-        var exists = false
-        for (i in 0 until accountsArray.length()) {
-            val obj = accountsArray.getJSONObject(i)
-            if (obj.getString("uid") == uid) {
-                obj.put("name", name)
-                obj.put("email", email)
-                obj.put("photoUrl", photoUrl)
-                exists = true
-                break
-            }
-        }
-        
-        if (!exists) {
-            val newAcc = JSONObject().apply {
-                put("uid", uid)
-                put("name", name)
-                put("email", email)
-                put("photoUrl", photoUrl)
-            }
-            accountsArray.put(newAcc)
-        }
-        
-        prefs.edit().putString("accounts_list", accountsArray.toString()).apply()
-    }
 
     fun signIn(forcePicker: Boolean = false) {
         if (forcePicker) {

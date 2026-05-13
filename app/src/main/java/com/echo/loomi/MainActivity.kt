@@ -140,14 +140,6 @@ class MainActivity : ComponentActivity() {
 }
 
 @Immutable
-data class AccountInfo(
-    val uid: String,
-    val name: String,
-    val email: String,
-    val photoUrl: String
-)
-
-@Immutable
 data class SnapUser(
     val uid: String,
     val name: String,
@@ -283,10 +275,7 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
                     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
                         Box(
                             modifier = Modifier.size(44.dp).align(Alignment.CenterStart).background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
-                                .combinedClickable(
-                                    onClick = { context.startActivity(Intent(context, Setting::class.java)) },
-                                    onLongClick = { onAddAccount() }
-                                ),
+                                .clickable { context.startActivity(Intent(context, Setting::class.java)) },
                             contentAlignment = Alignment.Center
                         ) {
                             Crossfade(targetState = isLoadingProfile, label = "profile_fade") { loading ->
@@ -311,10 +300,7 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
 
                         Box(
                             modifier = Modifier.align(Alignment.Center)
-                                .combinedClickable(
-                                    onClick = { context.startActivity(Intent(context, Setting::class.java)) },
-                                    onLongClick = { onAddAccount() }
-                                )
+                                .clickable { context.startActivity(Intent(context, Setting::class.java)) }
                         ) {
                             Image(painter = painterResource(id = R.drawable.logo), contentDescription = "Logo", modifier = Modifier.height(30.dp), contentScale = ContentScale.Fit)
                         }
