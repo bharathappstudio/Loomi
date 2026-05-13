@@ -439,7 +439,11 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(54.dp)
-                .border(2.dp, Color(0xFFFFA500).copy(alpha = 0.5f), CircleShape)
+                .border(
+                    width = 2.dp,
+                    color = if (user.status == "Online") Color(0xFF4CAF50) else Color(0xFFFFA500).copy(alpha = 0.5f),
+                    shape = CircleShape
+                )
                 .background(Color.White, CircleShape),
             contentAlignment = Alignment.Center
         ) {
@@ -461,17 +465,6 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
-            
-            // Online status dot
-            if (user.status == "Online") {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .align(Alignment.BottomEnd)
-                        .background(Color.Green, CircleShape)
-                        .border(2.dp, Color.White, CircleShape)
-                )
-            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -487,16 +480,10 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
                     formatLastSeen(user.lastSeen)
                 }
                 
-                val statusColor = if (user.lastMessage.isNotEmpty()) {
-                    Color.Gray
-                } else if (user.status == "Online") {
-                    Color(0xFF66BB6A)
-                } else {
-                    Color.Gray
-                }
+                val statusColor = Color.Gray
                 
                 Text(
-                    text = if (user.status == "Online" && user.lastMessage.isEmpty()) "● " else "➤ ",
+                    text = "➤ ",
                     color = statusColor,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(end = 4.dp)

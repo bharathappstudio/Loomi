@@ -4,9 +4,16 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
+import java.io.ByteArrayOutputStream
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -37,6 +44,8 @@ import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.ui.unit.fontscaling.MathUtils.lerp
 import androidx.core.view.WindowCompat
 import coil.compose.AsyncImage
@@ -108,6 +117,26 @@ fun MessageScreen(
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+            val base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT)
+            
+            val msgId = database.child("chats").child(chatId).push().key ?: ""
+            val message = ChatMessage(
+                id = msgId,
+                senderId = currentUid,
+                receiverId = receiverUid,
+                message = "img:$base64Image",
+                timestamp = System.currentTimeMillis()
+            )
+            database.child("chats").child(chatId).child(msgId).setValue(message)
+        }
+    }
+
     // Transform state
     var isReady by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -173,6 +202,9 @@ fun MessageScreen(
                         input = ""
                     }
                 },
+                onCameraClick = {
+                    cameraLauncher.launch(null)
+                },
                 isExpanded = isReady,
                 onExpandedChange = { isReady = it },
                 modifier = Modifier.padding(bottom = 20.dp)//floting nave bar hight
@@ -185,51 +217,80 @@ fun MessageScreen(
 fun MessageTopBar(receiverName: String, receiverImage: String, onBack: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.9f),
-        shadowElevation = 2.dp
+        color = Color.White.copy(alpha = 0.95f),
     ) {
-        Row(
-            modifier = Modifier
-                .statusBarsPadding()
-                .fillMaxWidth()
-                .height(64.dp)
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.Black
-                )
-            }
-            
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data("file:///android_asset/user/$receiverImage")
-                    .build(),
-                contentDescription = null,
+        Column {
+            Row(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-            
-            Spacer(Modifier.width(12.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = receiverName,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    .statusBarsPadding()
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.Black.copy(alpha = 0.7f)
+                    )
+                }
+                
+                Spacer(Modifier.width(4.dp))
+                
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data("file:///android_asset/user/$receiverImage")
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, Color.Black.copy(alpha = 0.05f), CircleShape),
+                    contentScale = ContentScale.Crop
                 )
-                Text(
-                    text = "Online",
-                    fontSize = 12.sp,
-                    color = Color(0xFF66BB6A)
-                )
+                
+                Spacer(Modifier.width(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = receiverName,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black.copy(alpha = 0.8f),
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { /* Call Action */ }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Call,
+                            contentDescription = "Call",
+                            tint = Color.Black.copy(alpha = 0.7f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    IconButton(onClick = { /* Video Call Action */ }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Videocam,
+                            contentDescription = "Video Call",
+                            tint = Color.Black.copy(alpha = 0.7f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
             }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(Color.Black.copy(alpha = 0.08f))
+            )
         }
     }
 }
@@ -240,6 +301,7 @@ fun FloatingBottomNavBar(
     text: String,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
+    onCameraClick: () -> Unit,
     isExpanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onSearchClick: () -> Unit = {},
@@ -283,7 +345,7 @@ fun FloatingBottomNavBar(
             if (animProgress < 0.5f) {
                 // Icons Mode
                 IconButton(
-                    onClick = { /* Handle camera */ },
+                    onClick = onCameraClick,
                     modifier = Modifier.size(36.dp).graphicsLayer(alpha = 1f - animProgress * 2)
                 ) {
                     Icon(Icons.Outlined.PhotoCamera, null, tint = Color.Black, modifier = Modifier.size(20.dp))
@@ -416,12 +478,30 @@ fun ChatBubble(msg: ChatMessage, isMe: Boolean) {
                 .border(1.dp, Color.White.copy(alpha = 0.80f), bubbleShape)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Text(
-                text = parseMarkdown(msg.message),
-                fontSize = 16.sp,
-                lineHeight = 22.sp,
-                color = Color(0xB3000000)
-            )
+            if (msg.message.startsWith("img:")) {
+                val base64Data = msg.message.substring(4)
+                val imageBytes = Base64.decode(base64Data, Base64.DEFAULT)
+                val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Image message",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 250.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } else {
+                Text(
+                    text = parseMarkdown(msg.message),
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    color = Color(0xB3000000)
+                )
+            }
         }
     }
 }
