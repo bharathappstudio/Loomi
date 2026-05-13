@@ -18,8 +18,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            // Replace with your actual path and credentials
+            storeFile = file("/home/bharath/StudioProjects/loomi.jks")
+            storePassword = "jarvisbharath07"
+            keyAlias = "key13"
+            keyPassword = "jarvisbharath07"
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
