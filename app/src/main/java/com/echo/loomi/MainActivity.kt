@@ -5,9 +5,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +24,8 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.unit.lerp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -30,9 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -43,6 +53,7 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.echo.loomi.ui.theme.LoomiTheme
+import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -120,6 +131,8 @@ data class SnapUser(
     val name: String,
     val status: String = "Offline",
     val lastSeen: Long = 0,
+    val lastMessage: String = "",
+    val lastMessageTime: Long = 0,
     val isPinned: Boolean = false,
     val imageName: String
 )
@@ -141,11 +154,42 @@ fun formatLastSeen(lastSeen: Long): String {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SnapStyleScreen(onLogout: () -> Unit) {
     val usersList = remember { mutableStateListOf<SnapUser>() }
     val currentUser = FirebaseAuth.getInstance().currentUser
-    var currentUserImage by remember { mutableStateOf("Ellipse 1.png") }
+    var currentUserImage by remember { mutableStateOf("") }
+    var isLoadingProfile by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+
+    // --- Profile Animation State ---
+    val googleColors = listOf(
+        Color(0xFF8AB4F8), Color(0xFFF28B82), Color(0xFFFDD663),
+        Color(0xFF81C995), Color(0xFF669DF6)
+    )
+    var colorIndex1 by remember { mutableIntStateOf(0) }
+    var colorIndex2 by remember { mutableIntStateOf(1) }
+    var colorIndex3 by remember { mutableIntStateOf(2) }
+
+    LaunchedEffect(Unit) {
+        // Show loading animation for 2 seconds before showing profile
+        delay(2000)
+        isLoadingProfile = false
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(700)
+            colorIndex1 = (colorIndex1 + 1) % googleColors.size
+            colorIndex2 = (colorIndex2 + 1) % googleColors.size
+            colorIndex3 = (colorIndex3 + 1) % googleColors.size
+        }
+    }
+
+    val c1 by animateColorAsState(googleColors[colorIndex1], tween(600), label = "c1")
+    val c2 by animateColorAsState(googleColors[colorIndex2], tween(600), label = "c2")
+    val c3 by animateColorAsState(googleColors[colorIndex3], tween(600), label = "c3")
 
     LaunchedEffect(Unit) {
         val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
@@ -172,7 +216,7 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
         database.child("users").child(uid).child("imageName")
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    currentUserImage = snapshot.getValue(String::class.java) ?: "Ellipse 1.png"
+                    currentUserImage = snapshot.getValue(String::class.java) ?: ""
                 }
                 override fun onCancelled(error: DatabaseError) {}
             })
@@ -185,21 +229,44 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
                     val otherUid = userSnapshot.child("uid").getValue(String::class.java) ?: ""
                     if (otherUid != uid) {
                         val name = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
-                        val imageName = userSnapshot.child("imageName").getValue(String::class.java) ?: "Ellipse 1.png"
+                        val imageName = userSnapshot.child("imageName").getValue(String::class.java) ?: ""
                         val status = userSnapshot.child("status").getValue(String::class.java) ?: "Offline"
                         val lastSeen = userSnapshot.child("lastSeen").getValue(Long::class.java) ?: 0L
-                        
-                        usersList.add(SnapUser(
+
+                        val user = SnapUser(
                             uid = otherUid,
-                            name = name, 
+                            name = name,
                             imageName = imageName,
                             status = status,
                             lastSeen = lastSeen
-                        ))
+                        )
+                        usersList.add(user)
+
+                        // Fetch last message for this user
+                        val chatId = if (uid < otherUid) "${uid}_$otherUid" else "${otherUid}_$uid"
+                        database.child("chats").child(chatId).limitToLast(1)
+                            .addValueEventListener(object : ValueEventListener {
+                                override fun onDataChange(chatSnapshot: DataSnapshot) {
+                                    if (chatSnapshot.exists()) {
+                                        val lastMsgObj = chatSnapshot.children.firstOrNull()
+                                        val lastMsgText = lastMsgObj?.child("message")?.getValue(String::class.java) ?: ""
+                                        val lastMsgTime = lastMsgObj?.child("timestamp")?.getValue(Long::class.java) ?: 0L
+                                        
+                                        val index = usersList.indexOfFirst { it.uid == otherUid }
+                                        if (index != -1) {
+                                            usersList[index] = usersList[index].copy(
+                                                lastMessage = lastMsgText,
+                                                lastMessageTime = lastMsgTime
+                                            )
+                                        }
+                                    }
+                                }
+                                override fun onCancelled(error: DatabaseError) {}
+                            })
                     }
                 }
-                // Sort online users to top
-                usersList.sortByDescending { it.status == "Online" }
+                // Sort by last message time if exists, otherwise status
+                usersList.sortWith(compareByDescending<SnapUser> { it.lastMessageTime }.thenByDescending { it.status == "Online" })
             }
 
             override fun onCancelled(error: DatabaseError) {}
@@ -224,30 +291,54 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Left: Profile Circle (Snap Style)
-                        Surface(
+                        // Left: Profile Circle with Loading Animation
+                        Box(
                             modifier = Modifier
-                                .size(45.dp)
-                                .align(Alignment.CenterStart),
-                            shape = CircleShape,
-                            border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFFFFF).copy(alpha = 0.5f)),
-                            color = Color.Transparent
+                                .size(44.dp)
+                                .align(Alignment.CenterStart)
+                                .background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            val context = LocalContext.current
-                            val profileRequest = remember(currentUserImage) {
-                                ImageRequest.Builder(context)
-                                    .data("file:///android_asset/user/$currentUserImage")
-                                    .placeholder(android.R.drawable.ic_menu_report_image)
-                                    .error(android.R.drawable.ic_menu_report_image)
-                                    .size(120, 120)
-                                    .build()
+                            Crossfade(
+                                targetState = isLoadingProfile,
+                                animationSpec = tween(1000),
+                                label = "profile_fade"
+                            ) { loading ->
+                                if (loading) {
+                                    LoadingIndicator(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                                            .drawWithContent {
+                                                drawContent()
+                                                drawRect(
+                                                    brush = Brush.linearGradient(listOf(c1, c2, c3)),
+                                                    blendMode = BlendMode.SrcAtop
+                                                )
+                                            },
+                                        color = Color.White
+                                    )
+                                } else {
+                                    val context = LocalContext.current
+                                    val profileRequest = remember(currentUserImage) {
+                                        ImageRequest.Builder(context)
+                                            .data("file:///android_asset/user/$currentUserImage")
+                                            .crossfade(true)
+                                            .size(120, 120)
+                                            .build()
+                                    }
+                                    if (currentUserImage.isNotEmpty()) {
+                                        AsyncImage(
+                                            model = profileRequest,
+                                            contentDescription = "Profile",
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                }
                             }
-                            AsyncImage(
-                                model = profileRequest,
-                                contentDescription = "Profile",
-                                modifier = Modifier.clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
                         }
 
                         // Center: Logo
@@ -263,10 +354,6 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
                             modifier = Modifier.align(Alignment.CenterEnd),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = onLogout) {
-                                Icon(Icons.Default.PushPin, contentDescription = "Logout", tint = Color.Black)
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
                             Box(contentAlignment = Alignment.TopEnd) {
                                 Surface(
                                     shape = CircleShape,
@@ -290,7 +377,14 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
                         key = { it.uid },
                         contentType = { "chat_item" }
                     ) { user ->
-                        SnapChatItem(user)
+                        SnapChatItem(user, onClick = {
+                            val intent = Intent(context, MessageActivity::class.java).apply {
+                                putExtra("receiverUid", user.uid)
+                                putExtra("receiverName", user.name)
+                                putExtra("receiverImage", user.imageName)
+                            }
+                            context.startActivity(intent)
+                        })
                     }
                 }
 
@@ -320,10 +414,11 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
 }
 
 @Composable
-fun SnapChatItem(user: SnapUser) {
+fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .drawBehind {
                 val strokeWidth = 0.5.dp.toPx()
                 val y = size.height - strokeWidth / 2
@@ -381,16 +476,35 @@ fun SnapChatItem(user: SnapUser) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = user.name, fontSize = 17.sp, fontWeight = FontWeight.Normal)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val statusText = if (user.status == "Online") "Online" else formatLastSeen(user.lastSeen)
-                val statusColor = if (user.status == "Online") Color(0xFF66BB6A) else Color.Gray
+                val statusText = if (user.lastMessage.isNotEmpty()) {
+                    user.lastMessage
+                } else if (user.status == "Online") {
+                    "Online"
+                } else {
+                    formatLastSeen(user.lastSeen)
+                }
+                
+                val statusColor = if (user.lastMessage.isNotEmpty()) {
+                    Color.Gray
+                } else if (user.status == "Online") {
+                    Color(0xFF66BB6A)
+                } else {
+                    Color.Gray
+                }
                 
                 Text(
-                    text = if (user.status == "Online") "● " else "➤ ",
+                    text = if (user.status == "Online" && user.lastMessage.isEmpty()) "● " else "➤ ",
                     color = statusColor,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(end = 4.dp)
                 )
-                Text(text = statusText, color = Color.Gray, fontSize = 13.sp)
+                Text(
+                    text = statusText,
+                    color = Color.Gray,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -404,51 +518,46 @@ fun FloatingBottomNavBar(
     Box(
         modifier = modifier
             .zIndex(1f)
+            .padding(horizontal = 80.dp)
+            .height(50.dp)
             .clip(RoundedCornerShape(30.dp))
-            .background(Color(0xFFFFF2D9).copy(alpha = 200f))
+            .background(Color(0xFFFFF2D9))
             .border(
                 width = 2.dp,
-                color = Color(0xFFFFFFFF).copy(alpha = 3000f),
+                color = Color.White.copy(alpha = 0.8f),
                 shape = RoundedCornerShape(30.dp)
             )
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = { /* Handle camera click */ },
+                onClick = { /* Handle camera */ },
                 modifier = Modifier.size(36.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.PhotoCamera,
-                    contentDescription = "Camera",
-                    tint = Color.Black,
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(Icons.Outlined.PhotoCamera, null, tint = Color.Black, modifier = Modifier.size(20.dp))
             }
+
+            Spacer(modifier = Modifier.width(20.dp))
+
             IconButton(
                 onClick = onSearchClick,
                 modifier = Modifier.size(36.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = "Search",
-                    tint = Color.Black,
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(Icons.Outlined.Search, null, tint = Color.Black, modifier = Modifier.size(20.dp))
             }
+
+            Spacer(modifier = Modifier.width(20.dp))
+
             IconButton(
-                onClick = { /* Handle check click */ },
+                onClick = { /* Handle done */ },
                 modifier = Modifier.size(36.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = "Done",
-                    tint = Color.Black,
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(Icons.Outlined.CheckCircle, null, tint = Color.Black, modifier = Modifier.size(20.dp))
             }
         }
     }
