@@ -19,6 +19,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -43,14 +45,6 @@ import com.echo.loomi.ui.theme.LoomiTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import kotlinx.coroutines.delay
-
-data class ChatMessage(
-    val id: String = "",
-    val senderId: String = "",
-    val receiverId: String = "",
-    val message: String = "",
-    val timestamp: Long = 0
-)
 
 class MessageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -251,6 +245,8 @@ fun FloatingBottomNavBar(
     onSearchClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val focusRequester = remember { FocusRequester() }
+
     val animProgress by animateFloatAsState(
         targetValue = if (isExpanded) 1f else 0f,
         animationSpec = spring(
@@ -341,9 +337,13 @@ fun FloatingBottomNavBar(
                         exit = fadeOut(animationSpec = tween(300)) + shrinkHorizontally(),
                         modifier = Modifier.weight(1f)
                     ) {
+                        LaunchedEffect(Unit) {
+                            focusRequester.requestFocus()
+                        }
                         TextField(
                             value = text,
                             onValueChange = onTextChange,
+                            modifier = Modifier.focusRequester(focusRequester),
                             placeholder = {
                                 Text(
                                     "Ask...",
