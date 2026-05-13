@@ -384,7 +384,7 @@ fun FloatingBottomNavBar(
                             .background(sendButtonColor)
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_launcher_foreground),
+                            painter = painterResource(R.drawable.send),
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
