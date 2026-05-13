@@ -55,32 +55,13 @@ import com.echo.loomi.ui.theme.LoomiTheme
 import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-
 class MainActivity : ComponentActivity() {
-
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         val auth = FirebaseAuth.getInstance()
         val prefs = getSharedPreferences("echo_prefs", MODE_PRIVATE)
-
-        // Request Notification Permission for Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
         
         // 1. Check if user is logged in
         if (auth.currentUser == null) {

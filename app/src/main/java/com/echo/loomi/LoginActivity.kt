@@ -1,11 +1,15 @@
 package com.echo.loomi
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -30,6 +34,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.echo.loomi.ui.theme.LoomiTheme
@@ -42,6 +47,13 @@ class LoginActivity : ComponentActivity() {
     private lateinit var googleAuthClient: GoogleAuthClient
     private var isLoading = mutableStateOf(false)
     private var errorMessage = mutableStateOf("")
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ -> 
+        // Proceed with sign in after permissions dialog
+        startGoogleSignIn()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,9 +74,7 @@ class LoginActivity : ComponentActivity() {
                     loading = isLoading.value,
                     error = errorMessage.value,
                     onLoginClick = {
-                        isLoading.value = true
-                        errorMessage.value = ""
-                        googleAuthClient.signIn()
+                        handleLoginTap()
                     },
                     onBackWhileLoading = {
                         isLoading.value = false
@@ -72,6 +82,32 @@ class LoginActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun handleLoginTap() {
+        val permissions = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        val permissionsToRequest = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
+        } else {
+            startGoogleSignIn()
+        }
+    }
+
+    private fun startGoogleSignIn() {
+        isLoading.value = true
+        errorMessage.value = ""
+        googleAuthClient.signIn()
     }
 
     private fun checkProfileAndNavigate() {
