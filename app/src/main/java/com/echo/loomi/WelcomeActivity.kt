@@ -49,15 +49,9 @@ class WelcomeActivity : ComponentActivity() {
 
 @Composable
 fun WelcomeScreen(onFinish: () -> Unit) {
-    val userImages = listOf(
-        "Ellipse 1.png", "Ellipse 2.png", "Ellipse 3.png", "Ellipse 4.png",
-        "Ellipse 5.png", "Ellipse 6.png", "Ellipse 7.png", "Ellipse 9.png",
-        "Ellipse 10.png", "Ellipse 11.png", "Ellipse 12.png", "Ellipse 13.png",
-        "Ellipse 14.png", "Ellipse 15.png", "Ellipse 16.png", "Ellipse 17.png",
-        "Ellipse 18.png", "Ellipse 47.png", "Ellipse 81.png", "Ellipse 112.png"
-    )
-
-    var selectedImage by remember { mutableStateOf(userImages[0]) }
+    val imageNames = (1..14).map { if (it < 10) "0$it.png" else "$it.png" }
+    var selectedGender by remember { mutableStateOf("Male") }
+    var selectedImage by remember { mutableStateOf(imageNames[0]) }
     val auth = FirebaseAuth.getInstance()
     val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
     val context = LocalContext.current
@@ -94,7 +88,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
-                            .data("file:///android_asset/user/$selectedImage")
+                            .data("file:///android_asset/Memoji/$selectedGender/Circle/$selectedImage")
                             .build(),
                         contentDescription = "Selected Profile",
                         modifier = Modifier.clip(CircleShape),
@@ -121,12 +115,47 @@ fun WelcomeScreen(onFinish: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Gender Filter Buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                listOf("Male", "Female").forEach { gender ->
+                    val isSelected = selectedGender == gender
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(if (isSelected) Color.Black else Color.White)
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) Color.Black else Color.LightGray.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .clickable { selectedGender = gender },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = gender,
+                            color = if (isSelected) Color.White else Color.Black,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(userImages) { imageName ->
+                items(imageNames) { imageName ->
                     val isSelected = selectedImage == imageName
                     Box(
                         modifier = Modifier
@@ -141,7 +170,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                     ) {
                         AsyncImage(
                             model = ImageRequest.Builder(context)
-                                .data("file:///android_asset/user/$imageName")
+                                .data("file:///android_asset/Memoji/$selectedGender/Circle/$imageName")
                                 .build(),
                             contentDescription = null,
                             modifier = Modifier.clip(CircleShape),
@@ -157,7 +186,8 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                 onClick = {
                     val user = auth.currentUser
                     if (user != null) {
-                        database.child("users").child(user.uid).child("imageName").setValue(selectedImage)
+                        val fullPath = "Memoji/$selectedGender/Circle/$selectedImage"
+                        database.child("users").child(user.uid).child("imageName").setValue(fullPath)
                             .addOnCompleteListener {
                                 // Save locally that profile is complete
                                 val prefs = context.getSharedPreferences("echo_prefs", android.content.Context.MODE_PRIVATE)

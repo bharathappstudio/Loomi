@@ -299,7 +299,10 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
                             modifier = Modifier
                                 .size(44.dp)
                                 .align(Alignment.CenterStart)
-                                .background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape),
+                                .background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
+                                .clickable {
+                                    context.startActivity(Intent(context, Setting::class.java))
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Crossfade(
@@ -325,7 +328,7 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
                                     val context = LocalContext.current
                                     val profileRequest = remember(currentUserImage) {
                                         ImageRequest.Builder(context)
-                                            .data("file:///android_asset/user/$currentUserImage")
+                                            .data("file:///android_asset/$currentUserImage")
                                             .crossfade(true)
                                             .size(120, 120)
                                             .build()
@@ -344,13 +347,22 @@ fun SnapStyleScreen(onLogout: () -> Unit) {
                             }
                         }
 
-                        // Center: Logo
-                        Image(
-                            painter = painterResource(id = R.drawable.logo),
-                            contentDescription = "Logo",
-                            modifier = Modifier.height(30.dp),
-                            contentScale = ContentScale.Fit
-                        )
+                        // Center: Greeting
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .clickable {
+                                    context.startActivity(Intent(context, Setting::class.java))
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.logo),
+                                contentDescription = "Logo",
+                                modifier = Modifier.height(24.dp).padding(end = 8.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
 
                         // Right Icons
                         Row(
@@ -450,7 +462,7 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
             val context = LocalContext.current
             val imageRequest = remember(user.imageName) {
                 ImageRequest.Builder(context)
-                    .data("file:///android_asset/user/${user.imageName}")
+                    .data("file:///android_asset/${user.imageName}")
                     .crossfade(true)
                     .placeholder(android.R.drawable.ic_menu_report_image)
                     .error(android.R.drawable.ic_menu_report_image)

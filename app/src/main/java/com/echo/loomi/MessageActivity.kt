@@ -243,7 +243,7 @@ fun MessageTopBar(receiverName: String, receiverImage: String, onBack: () -> Uni
                 
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data("file:///android_asset/user/$receiverImage")
+                        .data("file:///android_asset/$receiverImage")
                         .build(),
                     contentDescription = null,
                     modifier = Modifier
