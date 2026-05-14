@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -54,6 +55,7 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.echo.loomi.ui.theme.LoomiTheme
+import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import java.util.concurrent.TimeUnit
@@ -64,6 +66,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        try {
+            FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").setPersistenceEnabled(true)
+        } catch (e: Exception) {
+            // Already enabled or other issue
+        }
         
         googleAuthClient = GoogleAuthClient(this) { success ->
             if (success) {

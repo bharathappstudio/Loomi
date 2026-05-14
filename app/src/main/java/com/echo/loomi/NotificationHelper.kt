@@ -87,8 +87,9 @@ object NotificationHelper {
             // Custom Notification Layout
             val customLayout = RemoteViews(context.packageName, R.layout.notification_custom).apply {
                 setTextViewText(R.id.notification_title, senderName)
+                setTextViewText(R.id.notification_header_info, " • Loomi • Now")
                 setTextViewText(R.id.notification_message, messageText)
-                setTextViewText(R.id.notification_app_name, " • Loomi • Now")
+                
                 if (largeIcon != null) {
                     setImageViewBitmap(R.id.notification_profile_image, largeIcon)
                 }
@@ -97,12 +98,18 @@ object NotificationHelper {
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.logo)
+                .setContentTitle(senderName)
+                .setContentText(messageText)
                 .setCustomContentView(customLayout)
                 .setCustomBigContentView(customLayout)
                 .setCustomHeadsUpContentView(customLayout)
                 .setStyle(NotificationCompat.DecoratedCustomViewStyle())
                 .setAutoCancel(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX) // Max priority for force push
+                .setDefaults(NotificationCompat.DEFAULT_ALL) // Vibration and sound
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setFullScreenIntent(pendingIntent, false) // High-priority heads-up
                 .setContentIntent(pendingIntent)
                 .addAction(replyAction)
                 .build()

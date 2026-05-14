@@ -18,7 +18,12 @@ class MessageListenerService : Service() {
     }
 
     private fun startListening() {
-        val myUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val auth = FirebaseAuth.getInstance()
+        val myUid = auth.currentUser?.uid
+        
+        if (myUid == null) {
+            return
+        }
 
         database.child("users").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -32,6 +37,9 @@ class MessageListenerService : Service() {
                     val chatId = if (myUid < otherUid) "${myUid}_$otherUid" else "${otherUid}_$myUid"
                     
                     if (!listeners.containsKey(chatId)) {
+                        val chatRef = database.child("chats").child(chatId)
+                        chatRef.keepSynced(true)
+
                         val listener = object : ValueEventListener {
                             private var firstLoad = true
                             override fun onDataChange(chatSnapshot: DataSnapshot) {
@@ -39,8 +47,8 @@ class MessageListenerService : Service() {
                                     val lastMsgObj = chatSnapshot.children.lastOrNull()?.getValue(ChatMessage::class.java)
                                     if (lastMsgObj != null && lastMsgObj.senderId != myUid) {
                                         val now = System.currentTimeMillis()
-                                        // Only notify if message is less than 15 seconds old and it's not the first load
-                                        if (!firstLoad && (now - lastMsgObj.timestamp) < 15000) {
+                                        val isRecent = (now - lastMsgObj.timestamp) < 30000
+                                        if (!firstLoad || isRecent) {
                                             NotificationHelper.showMessageNotification(
                                                 this@MessageListenerService,
                                                 otherUid,
@@ -66,6 +74,13 @@ class MessageListenerService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val restartServiceIntent = Intent(applicationContext, this.javaClass)
+        restartServiceIntent.setPackage(packageName)
+        startService(restartServiceIntent)
+        super.onTaskRemoved(rootIntent)
+    }
 
     override fun onDestroy() {
         listeners.forEach { (chatId, listener) ->
