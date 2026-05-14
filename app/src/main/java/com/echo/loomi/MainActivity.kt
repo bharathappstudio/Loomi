@@ -20,11 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
@@ -361,7 +356,9 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
         val y = size.height - strokeWidth / 2
         drawLine(color = Color(0xFFEEEEEE), start = Offset(72.dp.toPx(), y), end = Offset(size.width, y), strokeWidth = strokeWidth)
     }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(54.dp).border(width = 2.dp, color = if (user.status == "Online") Color(0xFF4CAF50) else Color(0xFFFFA500).copy(alpha = 0.5f), shape = CircleShape).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(54.dp).border(width = 2.dp, color = if (user.status == "Online") Color(
+            0xFFA5D6A7
+        ) else Color(0xFFFFF59D).copy(alpha = 5f), shape = CircleShape).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
             val context = LocalContext.current
             val imageRequest = remember(user.imageName) { ImageRequest.Builder(context).data("file:///android_asset/${user.imageName}").crossfade(true).size(150, 150).build() }
             AsyncImage(model = imageRequest, contentDescription = null, modifier = Modifier.padding(4.dp).clip(CircleShape), contentScale = ContentScale.Crop)
@@ -382,11 +379,11 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
 fun FloatingBottomNavBar(onSearchClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier.zIndex(1f).padding(horizontal = 80.dp).height(50.dp).clip(RoundedCornerShape(30.dp)).background(Color(0xFFFFF2D9)).border(width = 2.dp, color = Color.White.copy(alpha = 0.8f), shape = RoundedCornerShape(30.dp))) {
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { }, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.PhotoCamera, null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+            IconButton(onClick = { }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.camera), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
             Spacer(modifier = Modifier.width(20.dp))
-            IconButton(onClick = onSearchClick, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.Search, null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+            IconButton(onClick = onSearchClick, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.search), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
             Spacer(modifier = Modifier.width(20.dp))
-            IconButton(onClick = { }, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.CheckCircle, null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+            IconButton(onClick = { }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.call), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
         }
     }
 }

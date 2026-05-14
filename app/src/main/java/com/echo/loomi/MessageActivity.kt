@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,12 +38,6 @@ import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.unit.lerp
-import androidx.compose.material.icons.outlined.Keyboard
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.ui.unit.fontscaling.MathUtils.lerp
 import androidx.core.view.WindowCompat
 import coil.compose.AsyncImage
@@ -233,7 +225,7 @@ fun MessageTopBar(receiverName: String, receiverImage: String, onBack: () -> Uni
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
+                        painter = painterResource(R.drawable.arrow_left),
                         contentDescription = "Back",
                         tint = Color.Black.copy(alpha = 0.7f)
                     )
@@ -268,7 +260,7 @@ fun MessageTopBar(receiverName: String, receiverImage: String, onBack: () -> Uni
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { /* Call Action */ }) {
                         Icon(
-                            imageVector = Icons.Outlined.Call,
+                            painter = painterResource(R.drawable.call),
                             contentDescription = "Call",
                             tint = Color.Black.copy(alpha = 0.7f),
                             modifier = Modifier.size(22.dp)
@@ -277,7 +269,7 @@ fun MessageTopBar(receiverName: String, receiverImage: String, onBack: () -> Uni
 
                     IconButton(onClick = { /* Video Call Action */ }) {
                         Icon(
-                            imageVector = Icons.Outlined.Videocam,
+                            painter = painterResource(R.drawable.videocam),
                             contentDescription = "Video Call",
                             tint = Color.Black.copy(alpha = 0.7f),
                             modifier = Modifier.size(24.dp)
@@ -348,7 +340,7 @@ fun FloatingBottomNavBar(
                     onClick = onCameraClick,
                     modifier = Modifier.size(36.dp).graphicsLayer(alpha = 1f - animProgress * 2)
                 ) {
-                    Icon(Icons.Outlined.PhotoCamera, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(R.drawable.camera), null, tint = Color.Black, modifier = Modifier.size(20.dp))
                 }
                 
                 Spacer(modifier = Modifier.width(20.dp))
@@ -357,7 +349,7 @@ fun FloatingBottomNavBar(
                     onClick = { onExpandedChange(true) },
                     modifier = Modifier.size(36.dp).graphicsLayer(alpha = 1f - animProgress * 2)
                 ) {
-                    Icon(Icons.Outlined.Keyboard, null, tint = Color.Black, modifier = Modifier.size(22.dp))
+                    Icon(painterResource(R.drawable.keyboard_keys_25dp_1f1f1f_fill0_wght400_grad0_opsz24), null, tint = Color.Black, modifier = Modifier.size(22.dp))
                 }
 
                 Spacer(modifier = Modifier.width(20.dp))
@@ -366,7 +358,7 @@ fun FloatingBottomNavBar(
                     onClick = onSearchClick,
                     modifier = Modifier.size(36.dp).graphicsLayer(alpha = 1f - animProgress * 2)
                 ) {
-                    Icon(Icons.Outlined.Search, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(R.drawable.search), null, tint = Color.Black, modifier = Modifier.size(20.dp))
                 }
             } else {
                 // Input Mode
@@ -384,7 +376,7 @@ fun FloatingBottomNavBar(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.logo),
+                            painter = painterResource(R.drawable.arrow___down_2),
                             contentDescription = null,
                             modifier = Modifier.size(22.dp), // Slightly smaller for premium feel
                             tint = Color.Unspecified
