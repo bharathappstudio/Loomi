@@ -29,6 +29,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -89,6 +90,17 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
             finish()
             return
+        }
+
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val token = task.result
+                val uid = auth.currentUser?.uid
+                if (uid != null) {
+                    FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/")
+                        .reference.child("users").child(uid).child("fcmToken").setValue(token)
+                }
+            }
         }
 
         val serviceIntent = Intent(this, MessageListenerService::class.java)

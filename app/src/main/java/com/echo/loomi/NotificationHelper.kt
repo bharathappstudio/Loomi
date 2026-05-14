@@ -26,6 +26,9 @@ object NotificationHelper {
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            // Channel for messages (High Importance)
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
@@ -33,7 +36,6 @@ object NotificationHelper {
             ).apply {
                 description = "Notifications for new messages in Loomi"
             }
-            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
         }
     }
@@ -87,7 +89,6 @@ object NotificationHelper {
             // Custom Notification Layout
             val customLayout = RemoteViews(context.packageName, R.layout.notification_custom).apply {
                 setTextViewText(R.id.notification_title, senderName)
-                setTextViewText(R.id.notification_header_info, " • Loomi • Now")
                 setTextViewText(R.id.notification_message, messageText)
                 
                 if (largeIcon != null) {
