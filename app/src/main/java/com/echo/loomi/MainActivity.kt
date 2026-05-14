@@ -6,7 +6,19 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -33,6 +45,8 @@ import com.google.firebase.database.ValueEventListener
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -181,10 +195,50 @@ fun formatLastSeen(lastSeen: Long): String {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
     val usersList = remember { mutableStateListOf<SnapUser>() }
+    var isSearchVisible by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+
+    // Auto-hide search bar when keyboard is closed
+    val isKeyboardVisible = WindowInsets.isImeVisible
+    var wasKeyboardOpened by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isKeyboardVisible) {
+        if (isKeyboardVisible) {
+            wasKeyboardOpened = true
+        } else if (wasKeyboardOpened && isSearchVisible) {
+            isSearchVisible = false
+            wasKeyboardOpened = false
+        }
+    }
+
+    LaunchedEffect(isSearchVisible) {
+        if (!isSearchVisible) {
+            wasKeyboardOpened = false
+            searchQuery = "" // Reset search query when hidden
+        }
+    }
+
+    val animProgress by animateFloatAsState(
+        targetValue = if (isSearchVisible) 1f else 0f,
+        animationSpec = tween(500, easing = LinearOutSlowInEasing),
+        label = "search_anim"
+    )
+
+    val filteredUsersList = remember {
+        derivedStateOf {
+            if (searchQuery.isEmpty()) {
+                usersList
+            } else {
+                usersList.filter { it.name.contains(searchQuery, ignoreCase = true) }
+            }
+        }
+    }
+
     val currentUser = FirebaseAuth.getInstance().currentUser
     var currentUserImage by remember { mutableStateOf("") }
     var isLoadingProfile by remember { mutableStateOf(true) }
@@ -296,10 +350,11 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
             containerColor = Color(0xFFFFFFFF).copy(alpha = 0.5f),
             topBar = {
                 Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
+                    // Header (Logo and Profile) - Always Visible
                     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
                         Box(
-                            modifier = Modifier.size(44.dp).align(Alignment.CenterStart).background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
-                                .clickable { context.startActivity(Intent(context, Setting::class.java)) },
+                            modifier = Modifier.size(44.dp).align(Alignment.CenterStart).clip(CircleShape).background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
+                                .clickable { context.startActivity(Intent(context, WelcomeActivity::class.java)) },
                             contentAlignment = Alignment.Center
                         ) {
                             Crossfade(targetState = isLoadingProfile, label = "profile_fade") { loading ->
@@ -330,7 +385,86 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
                         }
 
                         Row(modifier = Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(shape = CircleShape, color = Color.Yellow, modifier = Modifier.size(40.dp)) {}
+                            IconButton(
+                                onClick = { context.startActivity(Intent(context, Setting::class.java)) },
+                                modifier = Modifier.size(35.dp).clip(CircleShape).background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.setting_4),
+                                    contentDescription = "Settings",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = Color.Unspecified
+                                )
+                            }
+                        }
+                    }
+
+                    // Search Bar - Smoothly Animated
+                    AnimatedVisibility(
+                        visible = isSearchVisible,
+                        enter = fadeIn(animationSpec = tween(100)) + expandVertically(),
+                        exit = fadeOut(animationSpec = tween(100)) + shrinkVertically()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                                .height(54.dp)
+                                .clip(RoundedCornerShape(60.dp))
+                                .background(Color.White.copy(alpha = 0.5f))
+                                .border(2.dp, Color(0xFFC8E6C9), RoundedCornerShape(60.dp))
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(0.35f))
+                                    .clickable { isSearchVisible = false },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.search),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(22.dp),
+                                    tint = Color.Gray
+                                )
+                            }
+
+                            // 2. Smoothly animated TextField
+                            AnimatedVisibility(
+                                visible = animProgress > 0.5f,
+                                enter = fadeIn(animationSpec = tween(400)) + expandHorizontally(),
+                                exit = fadeOut(animationSpec = tween(300)) + shrinkHorizontally(),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                LaunchedEffect(Unit) {
+                                    focusRequester.requestFocus()
+                                }
+                                TextField(
+                                    value = searchQuery,
+                                    onValueChange = { searchQuery = it },
+                                    modifier = Modifier.focusRequester(focusRequester),
+                                    placeholder = {
+                                        Text(
+                                            "Search friends...",
+                                            color = Color.Black.copy(0.4f),
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        disabledContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        cursorColor = Color.Black
+                                    ),
+                                    singleLine = true,
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
+                                )
+                            }
                         }
                     }
                 }
@@ -338,7 +472,7 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
         ) { padding ->
             Box(modifier = Modifier.padding(padding).fillMaxSize()) {
                 LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 120.dp)) {
-                    items(items = usersList, key = { it.uid }) { user ->
+                    items(items = filteredUsersList.value, key = { it.uid }) { user ->
                         SnapChatItem(user, onClick = {
                             val intent = Intent(context, MessageActivity::class.java).apply {
                                 putExtra("receiverUid", user.uid)
@@ -353,7 +487,7 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
             }
         }
 
-        FloatingBottomNavBar(onSearchClick = { }, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp))
+        FloatingBottomNavBar(onSearchClick = { isSearchVisible = !isSearchVisible }, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp))
     }
 }
 
