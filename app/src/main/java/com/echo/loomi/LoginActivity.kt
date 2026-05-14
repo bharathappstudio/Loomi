@@ -50,9 +50,14 @@ class LoginActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ -> 
-        // Proceed with sign in after permissions dialog
-        startGoogleSignIn()
+    ) { results ->
+        val allGranted = results.values.all { it }
+        if (allGranted) {
+            startGoogleSignIn()
+        } else {
+            errorMessage.value = "All permissions (Location, Camera, Notifications) are required to login."
+            isLoading.value = false
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,7 +92,8 @@ class LoginActivity : ComponentActivity() {
     private fun handleLoginTap() {
         val permissions = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.CAMERA
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
@@ -98,6 +104,7 @@ class LoginActivity : ComponentActivity() {
         }
 
         if (permissionsToRequest.isNotEmpty()) {
+            isLoading.value = true
             requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
             startGoogleSignIn()

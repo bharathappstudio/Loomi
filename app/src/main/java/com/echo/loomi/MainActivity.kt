@@ -220,6 +220,15 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
         val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
         val uid = currentUser?.uid ?: return@LaunchedEffect
 
+        database.child("users").child(uid).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (!snapshot.exists()) {
+                    onLogout()
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
         val userStatusRef = database.child("users").child(uid).child("status")
         val lastSeenRef = database.child("users").child(uid).child("lastSeen")
         val connectedRef = database.child(".info/connected")
