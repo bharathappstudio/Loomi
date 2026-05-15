@@ -94,7 +94,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
     val c2 by animateColorAsState(googleColors[colorIndex2], tween(600), label = "c2")
     val c3 by animateColorAsState(googleColors[colorIndex3], tween(600), label = "c3")
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFA5D6A7))) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         // Background image consistent with LoginActivity
         Column(
             modifier = Modifier.fillMaxSize(),

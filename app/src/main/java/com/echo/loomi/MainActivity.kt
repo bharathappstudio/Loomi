@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -75,14 +76,42 @@ class MainActivity : ComponentActivity() {
     private lateinit var googleAuthClient: GoogleAuthClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
-        
+        enableEdgeToEdge()
+
+        setContent {
+            LoomiTheme {
+                SnapStyleScreen(
+                    onLogout = {
+                        val auth = FirebaseAuth.getInstance()
+                        val uid = auth.currentUser?.uid
+                        if (uid != null) {
+                            val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+                            database.child("users").child(uid).child("status").setValue("Offline")
+                            database.child("users").child(uid).child("lastSeen").setValue(ServerValue.TIMESTAMP)
+                        }
+                        googleAuthClient.signOut()
+                        getSharedPreferences("echo_prefs", MODE_PRIVATE).edit().clear().apply()
+
+                        val intent = Intent(this, LoginActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(intent)
+                        finish()
+                    },
+                    onAddAccount = {
+                        googleAuthClient.signIn(forcePicker = true)
+                    }
+                )
+            }
+        }
+
         try {
             FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").setPersistenceEnabled(true)
         } catch (e: Exception) {
             // Already enabled or other issue
         }
-        
+
         googleAuthClient = GoogleAuthClient(this) { success ->
             if (success) {
                 val prefs = getSharedPreferences("echo_prefs", MODE_PRIVATE)
@@ -90,10 +119,10 @@ class MainActivity : ComponentActivity() {
                 recreate()
             }
         }
-        
+
         val auth = FirebaseAuth.getInstance()
         val prefs = getSharedPreferences("echo_prefs", MODE_PRIVATE)
-        
+
         if (auth.currentUser == null) {
             val intent = Intent(this, LoginActivity::class.java)
             startActivity(intent)
@@ -114,14 +143,13 @@ class MainActivity : ComponentActivity() {
 
         val serviceIntent = Intent(this, MessageListenerService::class.java)
         startService(serviceIntent)
-        
+
         if (!prefs.getBoolean("profile_done", false)) {
             val db = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
             db.child("users").child(auth.currentUser!!.uid).child("imageName").get()
                 .addOnSuccessListener { snapshot ->
                     if (snapshot.exists()) {
                         prefs.edit().putBoolean("profile_done", true).apply()
-                        startApp()
                     } else {
                         val intent = Intent(this, WelcomeActivity::class.java)
                         startActivity(intent)
@@ -133,37 +161,6 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                     finish()
                 }
-        } else {
-            startApp()
-        }
-    }
-
-    private fun startApp() {
-        enableEdgeToEdge()
-        setContent {
-            LoomiTheme {
-                SnapStyleScreen(
-                    onLogout = {
-                        val auth = FirebaseAuth.getInstance()
-                        val uid = auth.currentUser?.uid
-                        if (uid != null) {
-                            val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
-                            database.child("users").child(uid).child("status").setValue("Offline")
-                            database.child("users").child(uid).child("lastSeen").setValue(ServerValue.TIMESTAMP)
-                        }
-                        googleAuthClient.signOut()
-                        getSharedPreferences("echo_prefs", MODE_PRIVATE).edit().clear().apply()
-                        
-                        val intent = Intent(this, LoginActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
-                    },
-                    onAddAccount = {
-                        googleAuthClient.signIn(forcePicker = true)
-                    }
-                )
-            }
         }
     }
 }
