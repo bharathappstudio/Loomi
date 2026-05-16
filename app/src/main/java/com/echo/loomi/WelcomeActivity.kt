@@ -94,8 +94,11 @@ fun WelcomeScreen(onFinish: () -> Unit) {
     val c2 by animateColorAsState(googleColors[colorIndex2], tween(600), label = "c2")
     val c3 by animateColorAsState(googleColors[colorIndex3], tween(600), label = "c3")
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
-        // Background image consistent with LoginActivity
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFC8E6C9))
+    ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -109,12 +112,12 @@ fun WelcomeScreen(onFinish: () -> Unit) {
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Spacer(modifier = Modifier.height(32.dp))
-                    
+
                     Box(
                         modifier = Modifier
                             .size(180.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.4f))
+                            .background(Color.White.copy(alpha = 0.4f))///
                             .border(4.dp, Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -161,33 +164,33 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-    val scope = rememberCoroutineScope()
+                val scope = rememberCoroutineScope()
 
-    // Gender Filter Buttons
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        listOf("Male", "Female").forEach { gender ->
-            val isSelected = selectedGender == gender
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(if (isSelected) Color.Black else Color(0xFFF5F5F5))
-                    .clickable {
-                        if (selectedGender != gender) {
-                            scope.launch {
-                                isProfileLoading = true
-                                selectedGender = gender
-                                delay(200)
-                                isProfileLoading = false
-                            }
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
+                // Gender Filter Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    listOf("Male", "Female").forEach { gender ->
+                        val isSelected = selectedGender == gender
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(if (isSelected) Color.Black else Color(0xFFF5F5F5))
+                                .clickable {
+                                    if (selectedGender != gender) {
+                                        scope.launch {
+                                            isProfileLoading = true
+                                            selectedGender = gender
+                                            delay(200)
+                                            isProfileLoading = false
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
                                 text = gender,
                                 color = if (isSelected) Color.White else Color.Black,

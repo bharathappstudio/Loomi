@@ -1,25 +1,19 @@
 package com.echo.loomi
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -27,15 +21,22 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.*
-import androidx.core.content.ContextCompat
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.content.edit
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.database.DataSnapshot
@@ -66,9 +67,8 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.echo.loomi.ui.theme.LoomiTheme
-import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.delay
-import org.json.JSONArray
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
                             database.child("users").child(uid).child("lastSeen").setValue(ServerValue.TIMESTAMP)
                         }
                         googleAuthClient.signOut()
-                        getSharedPreferences("echo_prefs", MODE_PRIVATE).edit().clear().apply()
+                        getSharedPreferences("echo_prefs", MODE_PRIVATE).edit { clear() }
 
                         val intent = Intent(this, LoginActivity::class.java)
                         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -108,14 +108,13 @@ class MainActivity : ComponentActivity() {
 
         try {
             FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").setPersistenceEnabled(true)
-        } catch (e: Exception) {
-            // Already enabled or other issue
-        }
+        } catch (ignored: Exception) {}
 
         googleAuthClient = GoogleAuthClient(this) { success ->
             if (success) {
-                val prefs = getSharedPreferences("echo_prefs", MODE_PRIVATE)
-                prefs.edit().putBoolean("profile_done", true).apply()
+                getSharedPreferences("echo_prefs", MODE_PRIVATE).edit {
+                    putBoolean("profile_done", true)
+                }
                 recreate()
             }
         }
@@ -149,7 +148,7 @@ class MainActivity : ComponentActivity() {
             db.child("users").child(auth.currentUser!!.uid).child("imageName").get()
                 .addOnSuccessListener { snapshot ->
                     if (snapshot.exists()) {
-                        prefs.edit().putBoolean("profile_done", true).apply()
+                        prefs.edit { putBoolean("profile_done", true) }
                     } else {
                         val intent = Intent(this, WelcomeActivity::class.java)
                         startActivity(intent)
@@ -192,15 +191,44 @@ fun formatLastSeen(lastSeen: Long): String {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
+    val pagerState = rememberPagerState(initialPage = 1) { 2 }
+    val scope = rememberCoroutineScope()
+
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize(),
+        beyondViewportPageCount = 0 // Optimization: Don't pre-load camera for privacy
+    ) { page ->
+        when (page) {
+            0 -> CameraScreen(onBack = {
+                scope.launch {
+                    pagerState.animateScrollToPage(1)
+                }
+            })
+            1 -> MainContent(
+                onLogout = onLogout,
+                onAddAccount = onAddAccount,
+                onCameraClick = {
+                    scope.launch {
+                        pagerState.animateScrollToPage(0)
+                    }
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: () -> Unit) {
     val usersList = remember { mutableStateListOf<SnapUser>() }
     var isSearchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
-    // Auto-hide search bar when keyboard is closed
     val isKeyboardVisible = WindowInsets.isImeVisible
     var wasKeyboardOpened by remember { mutableStateOf(false) }
 
@@ -216,7 +244,7 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
     LaunchedEffect(isSearchVisible) {
         if (!isSearchVisible) {
             wasKeyboardOpened = false
-            searchQuery = "" // Reset search query when hidden
+            searchQuery = "" 
         }
     }
 
@@ -344,10 +372,9 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = Color(0xFFFFFFFF).copy(alpha = 0.5f),
+            containerColor = Color.White,
             topBar = {
                 Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
-                    // Header (Logo and Profile) - Always Visible
                     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
                         Box(
                             modifier = Modifier.size(44.dp).align(Alignment.CenterStart).clip(CircleShape).background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
@@ -396,7 +423,6 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
                         }
                     }
 
-                    // Search Bar - Smoothly Animated
                     AnimatedVisibility(
                         visible = isSearchVisible,
                         enter = fadeIn(animationSpec = tween(100)) + expandVertically(),
@@ -429,7 +455,6 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
                                 )
                             }
 
-                            // 2. Smoothly animated TextField
                             AnimatedVisibility(
                                 visible = animProgress > 0.5f,
                                 enter = fadeIn(animationSpec = tween(400)) + expandHorizontally(),
@@ -484,7 +509,12 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
             }
         }
 
-        FloatingBottomNavBar(onSearchClick = { isSearchVisible = !isSearchVisible }, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp))
+        FloatingBottomNavBar(
+            onCameraClick = onCameraClick,
+            onSearchClick = { isSearchVisible = !isSearchVisible },
+            onAddAccount = onAddAccount,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp)
+        )
     }
 }
 
@@ -516,14 +546,19 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
 }
 
 @Composable
-fun FloatingBottomNavBar(onSearchClick: () -> Unit, modifier: Modifier = Modifier) {
+fun FloatingBottomNavBar(
+    onCameraClick: () -> Unit, 
+    onSearchClick: () -> Unit, 
+    onAddAccount: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(modifier = modifier.zIndex(1f).padding(horizontal = 80.dp).height(50.dp).clip(RoundedCornerShape(30.dp)).background(Color(0xFFFFF2D9)).border(width = 2.dp, color = Color.White.copy(alpha = 0.8f), shape = RoundedCornerShape(30.dp))) {
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.camera), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+            IconButton(onClick = onCameraClick, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.camera), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
             Spacer(modifier = Modifier.width(20.dp))
             IconButton(onClick = onSearchClick, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.search), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
             Spacer(modifier = Modifier.width(20.dp))
-            IconButton(onClick = { }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.call), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+            IconButton(onClick = onAddAccount, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.call), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
         }
     }
 }
