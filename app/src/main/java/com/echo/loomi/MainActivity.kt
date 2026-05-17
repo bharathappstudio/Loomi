@@ -221,14 +221,17 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
     HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize(),
-        beyondViewportPageCount = 0 // Stop camera from running in the background
+        beyondViewportPageCount = 1 // Keeps neighboring pages in memory for smooth transitions
     ) { page ->
         when (page) {
-            0 -> CameraScreen(onBack = {
-                scope.launch {
-                    pagerState.animateScrollToPage(1)
+            0 -> CameraScreen(
+                isActive = pagerState.currentPage == 0,
+                onBack = {
+                    scope.launch {
+                        pagerState.animateScrollToPage(1)
+                    }
                 }
-            })
+            )
             1 -> MainContent(
                 onLogout = onLogout,
                 onAddAccount = onAddAccount,

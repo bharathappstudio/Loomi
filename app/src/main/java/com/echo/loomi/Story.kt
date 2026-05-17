@@ -1,5 +1,6 @@
 package com.echo.loomi
 
+import android.app.Activity
 import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -7,6 +8,8 @@ import android.text.format.DateUtils
 import android.util.Base64
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -81,6 +84,12 @@ data class Story(
 fun StoryScreen(
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    SideEffect {
+        val window = (context as? Activity)?.window
+        window?.statusBarColor = android.graphics.Color.TRANSPARENT
+        window?.navigationBarColor = android.graphics.Color.TRANSPARENT
+    }
     BackHandler(onBack = onBack)
     val stories = remember { mutableStateListOf<Story>() }
     var selectedStoryForSheet by remember { mutableStateOf<Story?>(null) }
@@ -151,7 +160,16 @@ fun StoryScreen(
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { change, dragAmount ->
+                    if (dragAmount > 30) { // More sensitive right swipe
+                        onBack()
+                        change.consume()
+                    }
+                }
+            },
         containerColor = Color(0xFFFFFFFF),
         topBar = {
             Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {

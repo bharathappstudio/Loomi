@@ -1,5 +1,6 @@
 package com.echo.loomi
 
+import android.app.Activity
 import android.Manifest
 import android.content.ContentValues
 import android.content.Context
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -84,8 +86,16 @@ data class MusicTrack(
 )
 
 @Composable
-fun CameraScreen(onBack: () -> Unit) {
+fun CameraScreen(isActive: Boolean, onBack: () -> Unit) {
     val context = LocalContext.current
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (context as Activity).window
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        }
+    }
 
     BackHandler(onBack = onBack)
 
@@ -131,6 +141,7 @@ fun CameraScreen(onBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFFEFB600))) {
         if (hasCameraPermission) {
             CameraView(
+                isActive = isActive,
                 onBack = onBack,
                 onImageCaptured = { uri ->
                     // Image was handled by uploadToStory, just a general toast if needed or nothing
@@ -153,7 +164,7 @@ fun CameraScreen(onBack: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserImageAsset: String) {
+fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserImageAsset: String) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
@@ -236,7 +247,7 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
         }
     }
 
-    LaunchedEffect(lensFacing, flashMode) {
+    LaunchedEffect(lensFacing, flashMode, isActive) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
@@ -245,13 +256,15 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    cameraSelector,
-                    preview,
-                    imageCapture
-                )
-                preview.surfaceProvider = previewView.surfaceProvider
+                if (isActive) {
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        cameraSelector,
+                        preview,
+                        imageCapture
+                    )
+                    preview.surfaceProvider = previewView.surfaceProvider
+                }
             } catch (exc: Exception) {
                 Log.e("CameraView", "Use case binding failed", exc)
             }
