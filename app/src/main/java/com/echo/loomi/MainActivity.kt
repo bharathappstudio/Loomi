@@ -545,7 +545,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
             onSearchClick = { isSearchVisible = !isSearchVisible },
             onAddAccount = onAddAccount,
             onStoryClick = onStoryClick,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 45.dp)
         )
     }
 }

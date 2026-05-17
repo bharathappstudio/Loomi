@@ -147,65 +147,73 @@ fun StoryScreen(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color(0xFFFFFBF6),
         topBar = {
-            // Only Search Bar
             Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
-                AnimatedVisibility(
-                    visible = isSearchVisible,
-                    enter = fadeIn(animationSpec = tween(100)) + expandVertically(),
-                    exit = fadeOut(animationSpec = tween(100)) + shrinkVertically()
+                // Logo at the top
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .height(54.dp)
-                            .clip(RoundedCornerShape(60.dp))
-                            .background(Color.White.copy(alpha = 0.7f))
-                            .border(1.5.dp, Color(0xFFC8E6C9), RoundedCornerShape(60.dp))
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.search),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = Color.Gray
-                        )
+                    Image(
+                        painter = painterResource(id = R.drawable.welcom_to__loomi),
+                        contentDescription = "Loomi Logo",
+                        modifier = Modifier.height(35.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                }
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(54.dp)
+                        .clip(RoundedCornerShape(60.dp))
+                        .background(Color.White.copy(alpha = 0.7f))
+                        .border(1.5.dp, Color(0xFFC8E6C9), RoundedCornerShape(60.dp))
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.search),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.Gray
+                    )
 
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier.weight(1f),
-                            placeholder = {
-                                Text(
-                                    "Search stories or songs...",
-                                    color = Color.Gray,
-                                    fontSize = 15.sp
-                                )
-                            },
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = Color.Black
-                            ),
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
-                        )
+                    Spacer(modifier = Modifier.width(8.dp))
 
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(30.dp)) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.arrow___down_2), // Reusing existing icon for "clear" feel or just something to tap
-                                    contentDescription = "Clear",
-                                    modifier = Modifier.size(16.dp).graphicsLayer(rotationZ = 45f),
-                                    tint = Color.Gray
-                                )
-                            }
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = {
+                            Text(
+                                "Search stories or songs...",
+                                color = Color.Gray,
+                                fontSize = 15.sp
+                            )
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            cursorColor = Color.Black
+                        ),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
+                    )
+
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(30.dp)) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.arrow___down_2), // Reusing existing icon for "clear" feel or just something to tap
+                                contentDescription = "Clear",
+                                modifier = Modifier.size(16.dp).graphicsLayer(rotationZ = 45f),
+                                tint = Color.Gray
+                            )
                         }
                     }
                 }
@@ -459,7 +467,7 @@ fun StoryBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(),
-        containerColor = Color(0xFF81C995)
+        containerColor = Color(0xE6FFF6DE)
     ) {
         Column(
             modifier = Modifier
@@ -525,34 +533,6 @@ fun StoryBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = story.songName,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = "Shared by ${story.userName}",
-                        fontSize = 14.sp,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(songArtworkUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(70.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop,
-                    placeholder = painterResource(R.drawable.musicnote)
-                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -561,7 +541,7 @@ fun StoryBottomSheet(
             Text(
                 text = "Uploaded $timeAgo",
                 fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.7f)
+                color = Color.Black.copy(alpha = 0.7f)
             )
         }
     }
