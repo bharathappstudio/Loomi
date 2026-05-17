@@ -1,19 +1,26 @@
 package com.echo.loomi
 
-import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.text.format.DateUtils
 import android.util.Base64
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -23,6 +30,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +48,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseAuth
@@ -67,12 +76,17 @@ data class Story(
     var userProfileImage: String = ""
 )
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun StoryScreen(onBack: () -> Unit) {
+fun StoryScreen(
+    onBack: () -> Unit
+) {
     BackHandler(onBack = onBack)
     val stories = remember { mutableStateListOf<Story>() }
+    var selectedStoryForSheet by remember { mutableStateOf<Story?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var isSearchVisible by remember { mutableStateOf(false) }
+
     val filteredStories = remember(searchQuery, stories.toList()) {
         if (searchQuery.isEmpty()) {
             stories
@@ -84,7 +98,6 @@ fun StoryScreen(onBack: () -> Unit) {
         }
     }
     val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val mediaPlayer = remember { MediaPlayer() }
     var currentPlayingId by remember { mutableStateOf<String?>(null) }
@@ -136,57 +149,63 @@ fun StoryScreen(onBack: () -> Unit) {
         topBar = {
             // Only Search Bar
             Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(54.dp)
-                        .clip(RoundedCornerShape(60.dp))
-                        .background(Color.White.copy(alpha = 0.7f))
-                        .border(1.5.dp, Color(0xFFC8E6C9), RoundedCornerShape(60.dp))
-                        .padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                AnimatedVisibility(
+                    visible = isSearchVisible,
+                    enter = fadeIn(animationSpec = tween(100)) + expandVertically(),
+                    exit = fadeOut(animationSpec = tween(100)) + shrinkVertically()
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.search),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = Color.Gray
-                    )
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .height(54.dp)
+                            .clip(RoundedCornerShape(60.dp))
+                            .background(Color.White.copy(alpha = 0.7f))
+                            .border(1.5.dp, Color(0xFFC8E6C9), RoundedCornerShape(60.dp))
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.search),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = Color.Gray
+                        )
 
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = {
-                            Text(
-                                "Search stories or songs...",
-                                color = Color.Gray,
-                                fontSize = 15.sp
-                            )
-                        },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = Color.Black
-                        ),
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
-                    )
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(30.dp)) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.arrow___down_2), // Reusing existing icon for "clear" feel or just something to tap
-                                contentDescription = "Clear",
-                                modifier = Modifier.size(16.dp).graphicsLayer(rotationZ = 45f),
-                                tint = Color.Gray
-                            )
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.weight(1f),
+                            placeholder = {
+                                Text(
+                                    "Search stories or songs...",
+                                    color = Color.Gray,
+                                    fontSize = 15.sp
+                                )
+                            },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = Color.Black
+                            ),
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
+                        )
+
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(30.dp)) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.arrow___down_2), // Reusing existing icon for "clear" feel or just something to tap
+                                    contentDescription = "Clear",
+                                    modifier = Modifier.size(16.dp).graphicsLayer(rotationZ = 45f),
+                                    tint = Color.Gray
+                                )
+                            }
                         }
                     }
                 }
@@ -219,12 +238,22 @@ fun StoryScreen(onBack: () -> Unit) {
                                     }
                                 }
                             }
+                        },
+                        onStoryClick = {
+                            selectedStoryForSheet = story
                         }
                     )
                 }
             }
             // Bottom gradient to match MainActivity
             Box(modifier = Modifier.fillMaxWidth().height(250.dp).align(Alignment.BottomCenter).background(brush = Brush.verticalGradient(colors = listOf(Color.Transparent, Color(0xFFFFFBF6).copy(alpha = 0.9f)))))
+        }
+
+        if (selectedStoryForSheet != null) {
+            StoryBottomSheet(
+                story = selectedStoryForSheet!!,
+                onDismiss = { selectedStoryForSheet = null }
+            )
         }
     }
 }
@@ -233,7 +262,8 @@ fun StoryScreen(onBack: () -> Unit) {
 fun StoryItem(
     story: Story,
     isPlaying: Boolean,
-    onPlayToggle: () -> Unit
+    onPlayToggle: () -> Unit,
+    onStoryClick: () -> Unit
 ) {
     val bitmap = remember(story.image) {
         try {
@@ -259,9 +289,10 @@ fun StoryItem(
                     .clip(CircleShape)
                     .background(Color.Black)
                     .border(2.dp, if (isPlaying) Color(0xFF81C995) else Color.White, CircleShape)
+                    .clickable { onStoryClick() }
             ) {
                 if (bitmap != null) {
-                    androidx.compose.foundation.Image(
+                    Image(
                         bitmap = bitmap.asImageBitmap(),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
@@ -280,8 +311,8 @@ fun StoryItem(
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.5.dp, Color.White, RoundedCornerShape(12.dp))
                     .background(Color(0xFFFFE0B2))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(horizontal = 15.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(15.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(painterResource(R.drawable.call), contentDescription = null, tint = Color.Black, modifier = Modifier.size(10.dp))
@@ -292,7 +323,7 @@ fun StoryItem(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .offset(x = (-8.dp), y = 8.dp)
+                    .offset(x = -4.dp, y = 4.dp)
                     .size(35.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .border(1.5.dp, Color.White, RoundedCornerShape(8.dp))
@@ -308,23 +339,6 @@ fun StoryItem(
                     modifier = Modifier.size(18.dp)
                 )
             }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-        
-        Text(
-            text = story.userName,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
-        if (story.songName != "None" && story.songName.isNotEmpty()) {
-            Text(
-                text = story.songName,
-                fontSize = 10.sp,
-                color = Color.Gray,
-                maxLines = 1
-            )
         }
     }
 }
@@ -364,6 +378,191 @@ private suspend fun playStoryMusic(story: Story, mediaPlayer: MediaPlayer, onCom
             }
         } catch (e: Exception) {
             Log.e("StoryScreen", "Failed to play music", e)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StoryBottomSheet(
+    story: Story,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var songArtworkUrl by remember { mutableStateOf<String?>(null) }
+    var previewUrl by remember { mutableStateOf<String?>(null) }
+    val sheetMediaPlayer = remember { MediaPlayer() }
+    
+    val bitmap = remember(story.image) {
+        try {
+            val imageBytes = Base64.decode(story.image, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    val timeAgo = remember(story.timestamp) {
+        if (story.timestamp == 0L) "" 
+        else DateUtils.getRelativeTimeSpanString(story.timestamp, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+    }
+
+    LaunchedEffect(story.songId) {
+        if (story.songId == 0L) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            try {
+                val url = URL("https://itunes.apple.com/lookup?id=${story.songId}")
+                val connection = url.openConnection() as HttpURLConnection
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(response)
+                val results = json.getJSONArray("results")
+                if (results.length() > 0) {
+                    val item = results.getJSONObject(0)
+                    previewUrl = item.optString("previewUrl")
+                    songArtworkUrl = item.optString("artworkUrl100").replace("100x100bb.jpg", "600x600bb.jpg")
+                }
+            } catch (e: Exception) {
+                Log.e("StoryScreen", "Failed to fetch song details", e)
+            }
+        }
+    }
+
+    LaunchedEffect(previewUrl) {
+        previewUrl?.let { url ->
+            try {
+                sheetMediaPlayer.apply {
+                    stop()
+                    reset()
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build()
+                    )
+                    setDataSource(url)
+                    isLooping = true
+                    prepareAsync()
+                    setOnPreparedListener { start() }
+                }
+            } catch (e: Exception) {
+                Log.e("StoryScreen", "Failed to play music in sheet", e)
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            sheetMediaPlayer.release()
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        containerColor = Color(0xFF81C995)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 60.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // --- CENTERED STORY UI (Larger Version) ---
+            Box(modifier = Modifier.size(240.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black)
+                        .border(3.dp, Color.White, CircleShape)
+                ) {
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+
+                // Top-Right Pill
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 10.dp, y = 10.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .border(1.5.dp, Color.White, RoundedCornerShape(20.dp))
+                        .background(Color(0xFFFFE0B2))
+                        .padding(horizontal = 30.dp, vertical = 15.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(painterResource(R.drawable.call), null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Icon(painterResource(R.drawable.video), null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                }
+
+                // Bottom-Left Music Box
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = (-10.dp), y = (-10.dp))
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .border(2.dp, Color.White, RoundedCornerShape(15.dp))
+                        .background(Color(0xFFFFAB91))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(painterResource(R.drawable.musicnote), null, tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // --- SONG INFO ROW: Name (Left) | Image (Right) ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = story.songName,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "Shared by ${story.userName}",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                }
+
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(songArtworkUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(70.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(R.drawable.musicnote)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // --- UPLOAD TIME (Bottom) ---
+            Text(
+                text = "Uploaded $timeAgo",
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.7f)
+            )
         }
     }
 }

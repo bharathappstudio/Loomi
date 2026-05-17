@@ -196,7 +196,15 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
 
     DisposableEffect(Unit) {
         onDispose {
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                cameraProvider.unbindAll()
+            } catch (e: Exception) {
+                // Ignore errors on cleanup
+            }
             mediaPlayer.release()
+            cameraExecutor.shutdown()
         }
     }
 

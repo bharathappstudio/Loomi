@@ -22,6 +22,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
@@ -274,7 +275,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     LaunchedEffect(isSearchVisible) {
         if (!isSearchVisible) {
             wasKeyboardOpened = false
-            searchQuery = "" 
+            searchQuery = ""
         }
     }
 
@@ -543,6 +544,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
             onCameraClick = onCameraClick,
             onSearchClick = { isSearchVisible = !isSearchVisible },
             onAddAccount = onAddAccount,
+            onStoryClick = onStoryClick,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp)
         )
     }
@@ -575,11 +577,13 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FloatingBottomNavBar(
     onCameraClick: () -> Unit,
     onSearchClick: () -> Unit,
     onAddAccount: () -> Unit,
+    onStoryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.zIndex(1f).padding(horizontal = 80.dp).height(50.dp).clip(RoundedCornerShape(30.dp)).background(Color(0xFFFFF2D9)).border(width = 2.dp, color = Color.White.copy(alpha = 0.8f), shape = RoundedCornerShape(30.dp))) {
@@ -588,7 +592,18 @@ fun FloatingBottomNavBar(
             Spacer(modifier = Modifier.width(20.dp))
             IconButton(onClick = onSearchClick, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.search), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
             Spacer(modifier = Modifier.width(20.dp))
-            IconButton(onClick = onAddAccount, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.call), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .combinedClickable(
+                        onClick = onStoryClick,
+                        onLongClick = onAddAccount
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(painterResource(R.drawable.call), null, tint = Color.Black, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }
