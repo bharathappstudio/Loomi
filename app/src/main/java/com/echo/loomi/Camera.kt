@@ -6,9 +6,12 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Base64
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,8 +50,12 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import com.google.firebase.database.ServerValue
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
@@ -112,7 +119,7 @@ fun CameraScreen(onBack: () -> Unit) {
             CameraView(
                 onBack = onBack,
                 onImageCaptured = { uri ->
-                    Toast.makeText(context, "Image saved to gallery", Toast.LENGTH_SHORT).show()
+                    // Image was handled by uploadToStory, just a general toast if needed or nothing
                 },
                 currentUserImageAsset = currentUserImage
             )
@@ -136,6 +143,7 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
+    val scope = rememberCoroutineScope()
 
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
@@ -143,6 +151,17 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
     
     var showMusicSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
+    var selectedTrackId by remember { mutableStateOf<Long?>(null) }
+    var selectedTrackName by remember { mutableStateOf<String?>(null) }
+
+    val mediaPlayer = remember { MediaPlayer().apply { isLooping = true } }
+    var currentPlayingUrl by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mediaPlayer.release()
+        }
+    }
 
     val resolutionSelector = remember {
         ResolutionSelector.Builder()
@@ -393,10 +412,18 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
                         .clip(CircleShape)
                         .background(Color(0xFFA5D6A7))
                         .clickable {
-                            if (selectedPreviewUri != null) {
-                                onImageCaptured(selectedPreviewUri!!)
-                            } else {
-                                takePhoto(context, imageCapture, cameraExecutor, onImageCaptured)
+                            scope.launch {
+                                if (selectedPreviewUri != null) {
+                                    uploadToStory(context, selectedPreviewUri!!, selectedTrackId, selectedTrackName)
+                                    onImageCaptured(selectedPreviewUri!!)
+                                } else {
+                                    takePhoto(context, imageCapture, cameraExecutor) { uri ->
+                                        scope.launch {
+                                            uploadToStory(context, uri, selectedTrackId, selectedTrackName)
+                                            onImageCaptured(uri)
+                                        }
+                                    }
+                                }
                             }
                         }
                 )
@@ -427,12 +454,12 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
             var musicSearchQuery by remember { mutableStateOf("") }
             var musicResults by remember { mutableStateOf<List<MusicTrack>>(emptyList()) }
             var isSearching by remember { mutableStateOf(false) }
-            val mediaPlayer = remember { MediaPlayer() }
-            var currentPlayingUrl by remember { mutableStateOf<String?>(null) }
 
-            DisposableEffect(Unit) {
-                onDispose {
-                    mediaPlayer.release()
+            LaunchedEffect(Unit) {
+                if (musicSearchQuery.isEmpty()) {
+                    isSearching = true
+                    musicResults = searchMusic("tamil")
+                    isSearching = false
                 }
             }
 
@@ -442,7 +469,9 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
                     musicResults = searchMusic(musicSearchQuery)
                     isSearching = false
                 } else if (musicSearchQuery.isEmpty()) {
-                    musicResults = emptyList()
+                    isSearching = true
+                    musicResults = searchMusic("tamil")
+                    isSearching = false
                 }
             }
 
@@ -519,7 +548,10 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
                                             )
                                             mediaPlayer.setDataSource(track.previewUrl)
                                             mediaPlayer.prepareAsync()
-                                            mediaPlayer.setOnPreparedListener { it.start() }
+                                            mediaPlayer.setOnPreparedListener { 
+                                                it.isLooping = true
+                                                it.start() 
+                                            }
                                             currentPlayingUrl = track.previewUrl
                                         }
                                     }
@@ -544,8 +576,24 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
                                     Text(track.trackName, fontWeight = FontWeight.Bold, maxLines = 1)
                                     Text(track.artistName, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1)
                                 }
+                                
+                                // Selection Icon (Tap this to lock song and close sheet)
                                 if (currentPlayingUrl == track.previewUrl) {
-                                    Icon(painterResource(R.drawable.call), null, modifier = Modifier.size(20.dp), tint = Color.Green)
+                                    IconButton(
+                                        onClick = {
+                                            selectedTrackId = track.trackId
+                                            selectedTrackName = track.trackName
+                                            showMusicSheet = false
+                                        },
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.call),
+                                            contentDescription = "Select",
+                                            modifier = Modifier.size(24.dp),
+                                            tint = Color.Green
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -588,29 +636,81 @@ private suspend fun searchMusic(query: String): List<MusicTrack> = withContext(D
     results
 }
 
+private suspend fun uploadToStory(context: Context, uri: Uri, songId: Long?, songName: String?) {
+    val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+    
+    withContext(Dispatchers.IO) {
+        try {
+            val bitmap = if (uri.scheme == "http" || uri.scheme == "https") {
+                // Download bitmap from URL
+                val connection = URL(uri.toString()).openConnection() as HttpURLConnection
+                connection.doInput = true
+                connection.connect()
+                val input = connection.inputStream
+                BitmapFactory.decodeStream(input)
+            } else if (uri.toString().startsWith("file:///android_asset/")) {
+                // Load from assets
+                val assetPath = uri.toString().substringAfter("android_asset/")
+                context.assets.open(assetPath).use {
+                    BitmapFactory.decodeStream(it)
+                }
+            } else {
+                // Local file or content URI
+                context.contentResolver.openInputStream(uri)?.use {
+                    BitmapFactory.decodeStream(it)
+                }
+            }
+
+            if (bitmap == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Failed to process image", Toast.LENGTH_SHORT).show()
+                }
+                return@withContext
+            }
+
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+            val base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+            
+            val storyId = database.child("stories").push().key ?: ""
+            val storyData = mapOf(
+                "id" to storyId,
+                "uid" to currentUid,
+                "image" to base64Image,
+                "songId" to (songId ?: 0),
+                "songName" to (songName ?: "None"),
+                "timestamp" to ServerValue.TIMESTAMP
+            )
+            
+            database.child("stories").child(storyId).setValue(storyData)
+                .addOnSuccessListener {
+                    Toast.makeText(context, "Story uploaded successfully", Toast.LENGTH_SHORT).show()
+                    // Clean up temporary file if it exists in cache
+                    if (uri.toString().contains(context.cacheDir.path)) {
+                        File(uri.path ?: "").delete()
+                    }
+                }
+                .addOnFailureListener {
+                    Toast.makeText(context, "Story upload failed", Toast.LENGTH_SHORT).show()
+                }
+        } catch (e: Exception) {
+            Log.e("CameraView", "Error uploading story", e)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+}
+
 private fun takePhoto(
     context: Context,
     imageCapture: ImageCapture,
     executor: ExecutorService,
     onImageCaptured: (Uri) -> Unit
 ) {
-    val name = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.US)
-        .format(System.currentTimeMillis())
-    val contentValues = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Loomi")
-        }
-    }
-
-    val outputOptions = ImageCapture.OutputFileOptions
-        .Builder(
-            context.contentResolver,
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            contentValues
-        )
-        .build()
+    val photoFile = File(context.cacheDir, "temp_story_${System.currentTimeMillis()}.jpg")
+    val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
     imageCapture.takePicture(
         outputOptions,
@@ -621,7 +721,7 @@ private fun takePhoto(
             }
 
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                output.savedUri?.let { onImageCaptured(it) }
+                onImageCaptured(Uri.fromFile(photoFile))
             }
         }
     )
