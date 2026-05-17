@@ -14,6 +14,7 @@ import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -22,6 +23,9 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,11 +35,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -75,6 +86,9 @@ data class MusicTrack(
 @Composable
 fun CameraScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+
+    BackHandler(onBack = onBack)
+
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     var currentUserImage by remember { mutableStateOf("") }
 
@@ -137,7 +151,7 @@ fun CameraScreen(onBack: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserImageAsset: String) {
     val context = LocalContext.current
@@ -156,6 +170,29 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
 
     val mediaPlayer = remember { MediaPlayer().apply { isLooping = true } }
     var currentPlayingUrl by remember { mutableStateOf<String?>(null) }
+
+    var isUploading by remember { mutableStateOf(false) }
+
+    val googleColors = listOf(
+        Color(0xFF8AB4F8), Color(0xFFF28B82), Color(0xFFFDD663),
+        Color(0xFF81C995), Color(0xFF669DF6)
+    )
+    var colorIndex1 by remember { mutableIntStateOf(0) }
+    var colorIndex2 by remember { mutableIntStateOf(1) }
+    var colorIndex3 by remember { mutableIntStateOf(2) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(700)
+            colorIndex1 = (colorIndex1 + 1) % googleColors.size
+            colorIndex2 = (colorIndex2 + 1) % googleColors.size
+            colorIndex3 = (colorIndex3 + 1) % googleColors.size
+        }
+    }
+
+    val c1 by animateColorAsState(googleColors[colorIndex1], tween(600), label = "c1")
+    val c2 by animateColorAsState(googleColors[colorIndex2], tween(600), label = "c2")
+    val c3 by animateColorAsState(googleColors[colorIndex3], tween(600), label = "c3")
 
     DisposableEffect(Unit) {
         onDispose {
@@ -411,22 +448,44 @@ fun CameraView(onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserIm
                         .padding(4.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFA5D6A7))
-                        .clickable {
+                        .clickable(enabled = !isUploading) {
                             scope.launch {
+                                isUploading = true
                                 if (selectedPreviewUri != null) {
-                                    uploadToStory(context, selectedPreviewUri!!, selectedTrackId, selectedTrackName)
+                                    uploadToStory(context, selectedPreviewUri!!, selectedTrackId, selectedTrackName) {
+                                        isUploading = false
+                                    }
                                     onImageCaptured(selectedPreviewUri!!)
                                 } else {
                                     takePhoto(context, imageCapture, cameraExecutor) { uri ->
                                         scope.launch {
-                                            uploadToStory(context, uri, selectedTrackId, selectedTrackName)
+                                            uploadToStory(context, uri, selectedTrackId, selectedTrackName) {
+                                                isUploading = false
+                                            }
                                             onImageCaptured(uri)
                                         }
                                     }
                                 }
                             }
-                        }
-                )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isUploading) {
+                        LoadingIndicator(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        brush = Brush.linearGradient(listOf(c1, c2, c3)),
+                                        blendMode = BlendMode.SrcAtop
+                                    )
+                                },
+                            color = Color.White
+                        )
+                    }
+                }
 
                 IconButton(
                     onClick = {
@@ -636,8 +695,11 @@ private suspend fun searchMusic(query: String): List<MusicTrack> = withContext(D
     results
 }
 
-private suspend fun uploadToStory(context: Context, uri: Uri, songId: Long?, songName: String?) {
-    val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+private suspend fun uploadToStory(context: Context, uri: Uri, songId: Long?, songName: String?, onComplete: () -> Unit) {
+    val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: run {
+        onComplete()
+        return
+    }
     val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
     
     withContext(Dispatchers.IO) {
@@ -665,6 +727,7 @@ private suspend fun uploadToStory(context: Context, uri: Uri, songId: Long?, son
             if (bitmap == null) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Failed to process image", Toast.LENGTH_SHORT).show()
+                    onComplete()
                 }
                 return@withContext
             }
@@ -690,14 +753,17 @@ private suspend fun uploadToStory(context: Context, uri: Uri, songId: Long?, son
                     if (uri.toString().contains(context.cacheDir.path)) {
                         File(uri.path ?: "").delete()
                     }
+                    onComplete()
                 }
                 .addOnFailureListener {
                     Toast.makeText(context, "Story upload failed", Toast.LENGTH_SHORT).show()
+                    onComplete()
                 }
         } catch (e: Exception) {
             Log.e("CameraView", "Error uploading story", e)
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                onComplete()
             }
         }
     }

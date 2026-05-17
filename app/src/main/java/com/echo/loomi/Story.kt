@@ -1,0 +1,369 @@
+package com.echo.loomi
+
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.util.Base64
+import android.util.Log
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+
+data class Story(
+    val id: String = "",
+    val uid: String = "",
+    val image: String = "", // Base64
+    val songId: Long = 0,
+    val songName: String = "",
+    val timestamp: Long = 0,
+    var userName: String = "",
+    var userProfileImage: String = ""
+)
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun StoryScreen(onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    val stories = remember { mutableStateListOf<Story>() }
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredStories = remember(searchQuery, stories.toList()) {
+        if (searchQuery.isEmpty()) {
+            stories
+        } else {
+            stories.filter { 
+                it.userName.contains(searchQuery, ignoreCase = true) || 
+                it.songName.contains(searchQuery, ignoreCase = true) 
+            }
+        }
+    }
+    val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val mediaPlayer = remember { MediaPlayer() }
+    var currentPlayingId by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mediaPlayer.release()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // Fetch stories
+        database.child("stories").orderByChild("timestamp").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val newStoriesList = mutableListOf<Story>()
+                for (child in snapshot.children) {
+                    val story = child.getValue(Story::class.java)
+                    if (story != null) {
+                        newStoriesList.add(story)
+                    }
+                }
+                newStoriesList.reverse()
+                
+                newStoriesList.forEach { story ->
+                    database.child("users").child(story.uid).addListenerForSingleValueEvent(object : ValueEventListener {
+                        override fun onDataChange(userSnapshot: DataSnapshot) {
+                            story.userName = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
+                            story.userProfileImage = userSnapshot.child("imageName").getValue(String::class.java) ?: ""
+                            
+                            val index = stories.indexOfFirst { it.id == story.id }
+                            if (index != -1) {
+                                stories[index] = story.copy(userName = story.userName, userProfileImage = story.userProfileImage)
+                            } else {
+                                stories.add(story.copy(userName = story.userName, userProfileImage = story.userProfileImage))
+                                stories.sortByDescending { it.timestamp }
+                            }
+                        }
+                        override fun onCancelled(error: DatabaseError) {}
+                    })
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color(0xFFFFFBF6),
+        topBar = {
+            // Only Search Bar
+            Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(54.dp)
+                        .clip(RoundedCornerShape(60.dp))
+                        .background(Color.White.copy(alpha = 0.7f))
+                        .border(1.5.dp, Color(0xFFC8E6C9), RoundedCornerShape(60.dp))
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.search),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.Gray
+                    )
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = {
+                            Text(
+                                "Search stories or songs...",
+                                color = Color.Gray,
+                                fontSize = 15.sp
+                            )
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            cursorColor = Color.Black
+                        ),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
+                    )
+
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(30.dp)) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.arrow___down_2), // Reusing existing icon for "clear" feel or just something to tap
+                                contentDescription = "Clear",
+                                modifier = Modifier.size(16.dp).graphicsLayer(rotationZ = 45f),
+                                tint = Color.Gray
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            // Vertical 3-column grid
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 12.dp, start = 12.dp, end = 40.dp, bottom = 120.dp),
+                horizontalArrangement = Arrangement.spacedBy(15.dp),
+                verticalArrangement = Arrangement.spacedBy(15.dp)
+            ) {
+                items(filteredStories, key = { it.id }) { story ->
+                    StoryItem(
+                        story = story,
+                        isPlaying = currentPlayingId == story.id,
+                        onPlayToggle = {
+                            if (currentPlayingId == story.id) {
+                                mediaPlayer.stop()
+                                mediaPlayer.reset()
+                                currentPlayingId = null
+                            } else {
+                                currentPlayingId = story.id
+                                scope.launch {
+                                    playStoryMusic(story, mediaPlayer) {
+                                        currentPlayingId = null
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            // Bottom gradient to match MainActivity
+            Box(modifier = Modifier.fillMaxWidth().height(250.dp).align(Alignment.BottomCenter).background(brush = Brush.verticalGradient(colors = listOf(Color.Transparent, Color(0xFFFFFBF6).copy(alpha = 0.9f)))))
+        }
+    }
+}
+
+@Composable
+fun StoryItem(
+    story: Story,
+    isPlaying: Boolean,
+    onPlayToggle: () -> Unit
+) {
+    val bitmap = remember(story.image) {
+        try {
+            val imageBytes = Base64.decode(story.image, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // --- CENTERED OVERLAY GROUP (Scaled Down) ---
+        Box(modifier = Modifier.size(115.dp)) {
+            // 1. Centered Camera Circle (Now Story Image)
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .align(Alignment.Center)
+                    .aspectRatio(1f)
+                    .clip(CircleShape)
+                    .background(Color.Black)
+                    .border(2.dp, if (isPlaying) Color(0xFF81C995) else Color.White, CircleShape)
+            ) {
+                if (bitmap != null) {
+                    androidx.compose.foundation.Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Gray))
+                }
+            }
+
+            // 2. Top-Right Pill (Icons)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 10.dp, y = (-5).dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.5.dp, Color.White, RoundedCornerShape(12.dp))
+                    .background(Color(0xFFFFE0B2))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(painterResource(R.drawable.call), contentDescription = null, tint = Color.Black, modifier = Modifier.size(10.dp))
+                Icon(painterResource(R.drawable.video), contentDescription = null, tint = Color.Black, modifier = Modifier.size(10.dp))
+            }
+
+            // 3. Bottom-Left Rounded Square (Music)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(x = (-8.dp), y = 8.dp)
+                    .size(35.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.5.dp, Color.White, RoundedCornerShape(8.dp))
+                    .background(if (isPlaying) Color(0xFF81C995) else Color(0xFFFFAB91))
+                    .clickable { onPlayToggle() }
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painterResource(if (isPlaying) R.drawable.videocam else R.drawable.musicnote),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+        
+        Text(
+            text = story.userName,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+        if (story.songName != "None" && story.songName.isNotEmpty()) {
+            Text(
+                text = story.songName,
+                fontSize = 10.sp,
+                color = Color.Gray,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+private suspend fun playStoryMusic(story: Story, mediaPlayer: MediaPlayer, onComplete: () -> Unit) {
+    if (story.songId == 0L) return
+
+    withContext(Dispatchers.IO) {
+        try {
+            val url = URL("https://itunes.apple.com/lookup?id=${story.songId}")
+            val connection = url.openConnection() as HttpURLConnection
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            val results = json.getJSONArray("results")
+            if (results.length() > 0) {
+                val previewUrl = results.getJSONObject(0).getString("previewUrl")
+                
+                withContext(Dispatchers.Main) {
+                    mediaPlayer.stop()
+                    mediaPlayer.reset()
+                    mediaPlayer.setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build()
+                    )
+                    mediaPlayer.setDataSource(previewUrl)
+                    mediaPlayer.prepareAsync()
+                    mediaPlayer.setOnPreparedListener { 
+                        it.isLooping = false
+                        it.start() 
+                    }
+                    mediaPlayer.setOnCompletionListener {
+                        onComplete()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("StoryScreen", "Failed to play music", e)
+        }
+    }
+}

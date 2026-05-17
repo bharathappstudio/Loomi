@@ -1,6 +1,7 @@
 package com.echo.loomi
 
 import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -56,6 +57,13 @@ class MessageActivity : ComponentActivity() {
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         )
         enableEdgeToEdge()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
+
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         val receiverUid = intent.getStringExtra("receiverUid") ?: ""
         val receiverName = intent.getStringExtra("receiverName") ?: ""

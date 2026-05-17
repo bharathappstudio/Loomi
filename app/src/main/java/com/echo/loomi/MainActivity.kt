@@ -2,6 +2,7 @@ package com.echo.loomi
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -79,6 +80,13 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
+
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         setContent {
             LoomiTheme {
@@ -194,13 +202,25 @@ fun formatLastSeen(lastSeen: Long): String {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
-    val pagerState = rememberPagerState(initialPage = 1) { 2 }
+    val pagerState = rememberPagerState(initialPage = 1) { 3 }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Privacy Protocol: Dynamically block screenshots and stop camera when not visible
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+        val window = (context as? android.app.Activity)?.window ?: return@LaunchedEffect
+        val isCameraActive = pagerState.currentPage == 0 || pagerState.isScrollInProgress
+        if (isCameraActive) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
 
     HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize(),
-        beyondViewportPageCount = 0 // Optimization: Don't pre-load camera for privacy
+        beyondViewportPageCount = 0 // Stop camera from running in the background
     ) { page ->
         when (page) {
             0 -> CameraScreen(onBack = {
@@ -215,15 +235,25 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
                     scope.launch {
                         pagerState.animateScrollToPage(0)
                     }
+                },
+                onStoryClick = {
+                    scope.launch {
+                        pagerState.animateScrollToPage(2)
+                    }
                 }
             )
+            2 -> StoryScreen(onBack = {
+                scope.launch {
+                    pagerState.animateScrollToPage(1)
+                }
+            })
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: () -> Unit) {
+fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: () -> Unit, onStoryClick: () -> Unit) {
     val usersList = remember { mutableStateListOf<SnapUser>() }
     var isSearchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -513,7 +543,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
             onCameraClick = onCameraClick,
             onSearchClick = { isSearchVisible = !isSearchVisible },
             onAddAccount = onAddAccount,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp)
         )
     }
 }
@@ -547,8 +577,8 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
 
 @Composable
 fun FloatingBottomNavBar(
-    onCameraClick: () -> Unit, 
-    onSearchClick: () -> Unit, 
+    onCameraClick: () -> Unit,
+    onSearchClick: () -> Unit,
     onAddAccount: () -> Unit,
     modifier: Modifier = Modifier
 ) {
