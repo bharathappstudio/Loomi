@@ -91,9 +91,9 @@ fun StoryScreen(
         if (searchQuery.isEmpty()) {
             stories
         } else {
-            stories.filter { 
-                it.userName.contains(searchQuery, ignoreCase = true) || 
-                it.songName.contains(searchQuery, ignoreCase = true) 
+            stories.filter {
+                it.userName.contains(searchQuery, ignoreCase = true) ||
+                it.songName.contains(searchQuery, ignoreCase = true)
             }
         }
     }
@@ -109,9 +109,12 @@ fun StoryScreen(
     }
 
     LaunchedEffect(Unit) {
-        // Fetch stories
-        database.child("stories").orderByChild("timestamp").addValueEventListener(object : ValueEventListener {
+        database.child("stories").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                // Get current IDs from DB to remove deleted stories from UI
+                val dbStoryIds = snapshot.children.mapNotNull { it.key }
+                stories.removeAll { it.id !in dbStoryIds }
+
                 val newStoriesList = mutableListOf<Story>()
                 for (child in snapshot.children) {
                     val story = child.getValue(Story::class.java)
@@ -119,19 +122,23 @@ fun StoryScreen(
                         newStoriesList.add(story)
                     }
                 }
-                newStoriesList.reverse()
                 
-                newStoriesList.forEach { story ->
+                // Ensure only one story per user in the list (most recent one)
+                val uniqueStories = newStoriesList.groupBy { it.uid }
+                    .map { it.value.maxBy { s -> s.timestamp } }
+                    .sortedByDescending { it.timestamp }
+                
+                uniqueStories.forEach { story ->
                     database.child("users").child(story.uid).addListenerForSingleValueEvent(object : ValueEventListener {
                         override fun onDataChange(userSnapshot: DataSnapshot) {
-                            story.userName = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
-                            story.userProfileImage = userSnapshot.child("imageName").getValue(String::class.java) ?: ""
+                            val userName = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
+                            val userProfileImage = userSnapshot.child("imageName").getValue(String::class.java) ?: ""
                             
-                            val index = stories.indexOfFirst { it.id == story.id }
+                            val index = stories.indexOfFirst { it.uid == story.uid }
                             if (index != -1) {
-                                stories[index] = story.copy(userName = story.userName, userProfileImage = story.userProfileImage)
+                                stories[index] = story.copy(userName = userName, userProfileImage = userProfileImage)
                             } else {
-                                stories.add(story.copy(userName = story.userName, userProfileImage = story.userProfileImage))
+                                stories.add(story.copy(userName = userName, userProfileImage = userProfileImage))
                                 stories.sortByDescending { it.timestamp }
                             }
                         }
@@ -145,20 +152,20 @@ fun StoryScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color(0xFFFFFBF6),
+        containerColor = Color(0xFFFFFFFF),
         topBar = {
             Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
                 // Logo at the top
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp, bottom = 4.dp),
+                        .padding(top = 50.dp, bottom = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.welcom_to__loomi),
                         contentDescription = "Loomi Logo",
-                        modifier = Modifier.height(35.dp),
+                        modifier = Modifier.height(80.dp),
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -514,7 +521,7 @@ fun StoryBottomSheet(
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .offset(x = (-10.dp), y = (-10.dp))
+                        .offset(x = (-0.dp), y = (-10.dp))
                         .size(60.dp)
                         .clip(RoundedCornerShape(15.dp))
                         .border(2.dp, Color.White, RoundedCornerShape(15.dp))
@@ -535,7 +542,7 @@ fun StoryBottomSheet(
             ) {
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // --- UPLOAD TIME (Bottom) ---
             Text(

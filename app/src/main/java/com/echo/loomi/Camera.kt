@@ -744,29 +744,39 @@ private suspend fun uploadToStory(context: Context, uri: Uri, songId: Long?, son
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
             val base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
             
-            val storyId = database.child("stories").push().key ?: ""
-            val storyData = mapOf(
-                "id" to storyId,
-                "uid" to currentUid,
-                "image" to base64Image,
-                "songId" to (songId ?: 0),
-                "songName" to (songName ?: "None"),
-                "timestamp" to ServerValue.TIMESTAMP
-            )
-            
-            database.child("stories").child(storyId).setValue(storyData)
-                .addOnSuccessListener {
-                    Toast.makeText(context, "Story uploaded successfully", Toast.LENGTH_SHORT).show()
-                    // Clean up temporary file if it exists in cache
-                    if (uri.toString().contains(context.cacheDir.path)) {
-                        File(uri.path ?: "").delete()
+            // First, delete any existing stories for this user to ensure only one exists
+            database.child("stories").orderByChild("uid").equalTo(currentUid).get().addOnSuccessListener { snapshot ->
+                for (child in snapshot.children) {
+                    child.ref.removeValue()
+                }
+
+                val storyId = currentUid // Use UID as the story ID
+                val storyData = mapOf(
+                    "id" to storyId,
+                    "uid" to currentUid,
+                    "image" to base64Image,
+                    "songId" to (songId ?: 0),
+                    "songName" to (songName ?: "None"),
+                    "timestamp" to ServerValue.TIMESTAMP
+                )
+                
+                database.child("stories").child(storyId).setValue(storyData)
+                    .addOnSuccessListener {
+                        Toast.makeText(context, "Story uploaded successfully", Toast.LENGTH_SHORT).show()
+                        // Clean up temporary file if it exists in cache
+                        if (uri.toString().contains(context.cacheDir.path)) {
+                            File(uri.path ?: "").delete()
+                        }
+                        onComplete()
                     }
-                    onComplete()
-                }
-                .addOnFailureListener {
-                    Toast.makeText(context, "Story upload failed", Toast.LENGTH_SHORT).show()
-                    onComplete()
-                }
+                    .addOnFailureListener {
+                        Toast.makeText(context, "Story upload failed", Toast.LENGTH_SHORT).show()
+                        onComplete()
+                    }
+            }.addOnFailureListener {
+                Log.e("CameraView", "Failed to clean up old stories", it)
+                onComplete()
+            }
         } catch (e: Exception) {
             Log.e("CameraView", "Error uploading story", e)
             withContext(Dispatchers.Main) {
