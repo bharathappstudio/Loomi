@@ -102,7 +102,7 @@ fun StoryScreen(
         } else {
             stories.filter {
                 it.userName.contains(searchQuery, ignoreCase = true) ||
-                it.songName.contains(searchQuery, ignoreCase = true)
+                        it.songName.contains(searchQuery, ignoreCase = true)
             }
         }
     }
@@ -131,18 +131,18 @@ fun StoryScreen(
                         newStoriesList.add(story)
                     }
                 }
-                
+
                 // Ensure only one story per user in the list (most recent one)
                 val uniqueStories = newStoriesList.groupBy { it.uid }
                     .map { it.value.maxBy { s -> s.timestamp } }
                     .sortedByDescending { it.timestamp }
-                
+
                 uniqueStories.forEach { story ->
                     database.child("users").child(story.uid).addListenerForSingleValueEvent(object : ValueEventListener {
                         override fun onDataChange(userSnapshot: DataSnapshot) {
                             val userName = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
                             val userProfileImage = userSnapshot.child("imageName").getValue(String::class.java) ?: ""
-                            
+
                             val index = stories.indexOfFirst { it.uid == story.uid }
                             if (index != -1) {
                                 stories[index] = story.copy(userName = userName, userProfileImage = userProfileImage)
@@ -336,21 +336,6 @@ fun StoryItem(
                 }
             }
 
-            // 2. Top-Right Pill (Icons)
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 10.dp, y = (-5).dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.5.dp, Color.White, RoundedCornerShape(12.dp))
-                    .background(Color(0xFFFFE0B2))
-                    .padding(horizontal = 15.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(15.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(painterResource(R.drawable.call), contentDescription = null, tint = Color.Black, modifier = Modifier.size(10.dp))
-                Icon(painterResource(R.drawable.video), contentDescription = null, tint = Color.Black, modifier = Modifier.size(10.dp))
-            }
 
             // 3. Bottom-Left Rounded Square (Music)
             Box(
@@ -388,7 +373,7 @@ private suspend fun playStoryMusic(story: Story, mediaPlayer: MediaPlayer, onCom
             val results = json.getJSONArray("results")
             if (results.length() > 0) {
                 val previewUrl = results.getJSONObject(0).getString("previewUrl")
-                
+
                 withContext(Dispatchers.Main) {
                     mediaPlayer.stop()
                     mediaPlayer.reset()
@@ -400,9 +385,9 @@ private suspend fun playStoryMusic(story: Story, mediaPlayer: MediaPlayer, onCom
                     )
                     mediaPlayer.setDataSource(previewUrl)
                     mediaPlayer.prepareAsync()
-                    mediaPlayer.setOnPreparedListener { 
+                    mediaPlayer.setOnPreparedListener {
                         it.isLooping = false
-                        it.start() 
+                        it.start()
                     }
                     mediaPlayer.setOnCompletionListener {
                         onComplete()
@@ -425,7 +410,7 @@ fun StoryBottomSheet(
     var songArtworkUrl by remember { mutableStateOf<String?>(null) }
     var previewUrl by remember { mutableStateOf<String?>(null) }
     val sheetMediaPlayer = remember { MediaPlayer() }
-    
+
     val bitmap = remember(story.image) {
         try {
             val imageBytes = Base64.decode(story.image, Base64.DEFAULT)
@@ -436,7 +421,7 @@ fun StoryBottomSheet(
     }
 
     val timeAgo = remember(story.timestamp) {
-        if (story.timestamp == 0L) "" 
+        if (story.timestamp == 0L) ""
         else DateUtils.getRelativeTimeSpanString(story.timestamp, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
     }
 

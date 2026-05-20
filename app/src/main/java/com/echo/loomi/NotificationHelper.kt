@@ -22,6 +22,8 @@ import java.io.InputStream
 object NotificationHelper {
     private const val CHANNEL_ID = "loomi_messages"
     private const val CHANNEL_NAME = "Loomi Messages"
+    private const val CALL_CHANNEL_ID = "loomi_calls"
+    private const val CALL_CHANNEL_NAME = "Loomi Calls"
     const val KEY_TEXT_REPLY = "key_text_reply"
 
     fun createNotificationChannel(context: Context) {
@@ -37,6 +39,18 @@ object NotificationHelper {
                 description = "Notifications for new messages in Loomi"
             }
             manager.createNotificationChannel(channel)
+
+            // Channel for calls (Max Importance)
+            val callChannel = NotificationChannel(
+                CALL_CHANNEL_ID,
+                CALL_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications for incoming calls"
+                setSound(null, null) // Handled by activity or custom sound
+                enableVibration(true)
+            }
+            manager.createNotificationChannel(callChannel)
         }
     }
 
@@ -118,6 +132,42 @@ object NotificationHelper {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.notify(notificationId, notification)
         }
+    }
+
+    fun showCallNotification(
+        context: Context,
+        callerId: String,
+        callerName: String,
+        callerImage: String
+    ) {
+        val notificationId = 1001 // Fixed ID for calls
+
+        // Intent to open CallActivity
+        val intent = Intent(context, CallActivity::class.java).apply {
+            putExtra("receiverUid", callerId)
+            putExtra("receiverName", callerName)
+            putExtra("receiverImage", callerImage)
+            putExtra("isIncoming", true)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, notificationId, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CALL_CHANNEL_ID)
+            .setSmallIcon(R.drawable.call)
+            .setContentTitle("Incoming Call")
+            .setContentText("$callerName is calling you...")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setFullScreenIntent(pendingIntent, true)
+            .setAutoCancel(true)
+            .setOngoing(true)
+            .build()
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(notificationId, notification)
     }
 
     private suspend fun getLargeIcon(context: Context, senderImage: String): Bitmap? {

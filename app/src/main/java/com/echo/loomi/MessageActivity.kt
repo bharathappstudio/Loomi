@@ -27,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -47,6 +46,8 @@ import com.echo.loomi.ui.theme.LoomiTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import kotlinx.coroutines.delay
+import androidx.compose.material3.ExperimentalMaterial3Api
+import android.content.Intent
 
 class MessageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -101,6 +102,7 @@ fun parseMarkdown(text: String): AnnotatedString {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageScreen(
     receiverUid: String,
@@ -116,6 +118,13 @@ fun MessageScreen(
     val messagesList = remember { mutableStateListOf<ChatMessage>() }
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    // Call state
+    var showCallSheet by remember { mutableStateOf(false) }
+    var currentCallState by remember { mutableStateOf(CallState.IDLE) }
+    var activeCallData by remember { mutableStateOf<CallData?>(null) }
+
+    val context = LocalContext.current
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -165,12 +174,68 @@ fun MessageScreen(
         }
     }
 
+    // Listen for incoming calls for the current user
+    LaunchedEffect(currentUid) {
+        database.child("calls").child(currentUid).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val callData = snapshot.getValue(CallData::class.java)
+                if (callData != null) {
+                    activeCallData = callData
+                    if (callData.status == "ringing") {
+                        currentCallState = CallState.INCOMING
+                        showCallSheet = true
+                    } else if (callData.status == "accepted") {
+                        currentCallState = CallState.ONGOING
+                    } else if (callData.status == "declined" || callData.status == "ended") {
+                        showCallSheet = false
+                        currentCallState = CallState.IDLE
+                    }
+                } else if (currentCallState == CallState.INCOMING || currentCallState == CallState.ONGOING) {
+                    showCallSheet = false
+                    currentCallState = CallState.IDLE
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    // Listen for outgoing call status (on the receiver's node)
+    LaunchedEffect(showCallSheet, currentCallState) {
+        if (currentCallState == CallState.OUTGOING) {
+            database.child("calls").child(receiverUid).addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val status = snapshot.child("status").getValue(String::class.java)
+                    if (status == "accepted") {
+                        currentCallState = CallState.ONGOING
+                    } else if (status == null || status == "declined" || status == "ended") {
+                        showCallSheet = false
+                        currentCallState = CallState.IDLE
+                    }
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Background
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFFF3E0)))
 
-        Column(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
-            MessageTopBar(receiverName, receiverImage, onBack)
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .navigationBarsPadding()
+        ) {
+            MessageTopBar(
+                receiverName = receiverName,
+                receiverImage = receiverImage,
+                onBack = onBack,
+                onCallClick = {
+                    startCall(receiverUid, receiverName, receiverImage)
+                    currentCallState = CallState.OUTGOING
+                    showCallSheet = true
+                }
+            )
             
             Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
@@ -191,11 +256,13 @@ fun MessageScreen(
                 onSend = {
                     if (input.trim().isNotEmpty()) {
                         val msgId = database.child("chats").child(chatId).push().key ?: ""
+                        // End-to-End Encryption
+                        val encryptedMessage = EncryptionUtils.encrypt(input)
                         val message = ChatMessage(
                             id = msgId,
                             senderId = currentUid,
                             receiverId = receiverUid,
-                            message = input,
+                            message = encryptedMessage,
                             timestamp = System.currentTimeMillis()
                         )
                         database.child("chats").child(chatId).child(msgId).setValue(message)
@@ -210,11 +277,50 @@ fun MessageScreen(
                 modifier = Modifier.padding(bottom = 20.dp)//floting nave bar hight
             )
         }
+
+        if (showCallSheet) {
+            CallBottomSheet(
+                receiverName = if (currentCallState == CallState.INCOMING) activeCallData?.callerName ?: "Unknown" else receiverName,
+                receiverImage = if (currentCallState == CallState.INCOMING) activeCallData?.callerImage ?: receiverImage else receiverImage,
+                callState = currentCallState,
+                onAccept = {
+                    database.child("calls").child(currentUid).child("status").setValue("accepted")
+                    currentCallState = CallState.ONGOING
+                },
+                onDecline = {
+                    endCall(currentUid)
+                    showCallSheet = false
+                    currentCallState = CallState.IDLE
+                },
+                onEnd = {
+                    if (currentCallState == CallState.OUTGOING) {
+                        endCall(receiverUid)
+                    } else {
+                        endCall(currentUid)
+                    }
+                    showCallSheet = false
+                    currentCallState = CallState.IDLE
+                },
+                onDismiss = {
+                    if (currentCallState != CallState.ONGOING) {
+                        if (currentCallState == CallState.OUTGOING) endCall(receiverUid)
+                        else if (currentCallState == CallState.INCOMING) endCall(currentUid)
+                        showCallSheet = false
+                        currentCallState = CallState.IDLE
+                    }
+                }
+            )
+        }
     }
 }
 
 @Composable
-fun MessageTopBar(receiverName: String, receiverImage: String, onBack: () -> Unit) {
+fun MessageTopBar(
+    receiverName: String,
+    receiverImage: String,
+    onBack: () -> Unit,
+    onCallClick: () -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color.White.copy(alpha = 0.95f),
@@ -266,7 +372,7 @@ fun MessageTopBar(receiverName: String, receiverImage: String, onBack: () -> Uni
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { /* Call Action */ }) {
+                    IconButton(onClick = onCallClick) {
                         Icon(
                             painter = painterResource(R.drawable.call),
                             contentDescription = "Call",
@@ -495,8 +601,10 @@ fun ChatBubble(msg: ChatMessage, isMe: Boolean) {
                     )
                 }
             } else {
+                // End-to-End Decryption
+                val decryptedMessage = EncryptionUtils.decrypt(msg.message)
                 Text(
-                    text = parseMarkdown(msg.message),
+                    text = parseMarkdown(decryptedMessage),
                     fontSize = 16.sp,
                     lineHeight = 22.sp,
                     color = Color(0xB3000000)

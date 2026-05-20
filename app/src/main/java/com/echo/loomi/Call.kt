@@ -1,0 +1,181 @@
+package com.echo.loomi
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+
+enum class CallState {
+    IDLE, INCOMING, OUTGOING, ONGOING, ENDED
+}
+
+data class CallData(
+    val callerId: String = "",
+    val receiverId: String = "",
+    val callerName: String = "",
+    val callerImage: String = "",
+    val status: String = "ringing", // ringing, accepted, declined, ended
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CallBottomSheet(
+    receiverName: String,
+    receiverImage: String,
+    callState: CallState,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+    onEnd: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 40.dp, top = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // User Image
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data("file:///android_asset/$receiverImage")
+                    .build(),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Color.Black.copy(alpha = 0.1f), CircleShape),
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // User Name
+            Text(
+                text = receiverName,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Call Status
+            Text(
+                text = when (callState) {
+                    CallState.INCOMING -> "Incoming call..."
+                    CallState.OUTGOING -> "Calling..."
+                    CallState.ONGOING -> "00:00"
+                    CallState.ENDED -> "Call ended"
+                    CallState.IDLE -> ""
+                },
+                fontSize = 16.sp,
+                color = Color.Gray
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (callState == CallState.INCOMING) {
+                    // Decline Button
+                    IconButton(
+                        onClick = onDecline,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF5252))
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.call),
+                            contentDescription = "Decline",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    // Accept Button
+                    IconButton(
+                        onClick = onAccept,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF4CAF50))
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.call),
+                            contentDescription = "Accept",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                } else if (callState == CallState.OUTGOING || callState == CallState.ONGOING) {
+                    // End Call Button
+                    IconButton(
+                        onClick = onEnd,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF5252))
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.call),
+                            contentDescription = "End Call",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun startCall(receiverUid: String, receiverName: String, receiverImage: String) {
+    val auth = FirebaseAuth.getInstance()
+    val currentUid = auth.currentUser?.uid ?: return
+    val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+
+    val callData = CallData(
+        callerId = currentUid,
+        receiverId = receiverUid,
+        callerName = "You", // Ideally get current user's name
+        callerImage = "", // Ideally get current user's image
+        status = "ringing"
+    )
+
+    database.child("calls").child(receiverUid).setValue(callData)
+}
+
+fun endCall(receiverUid: String) {
+    val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+    database.child("calls").child(receiverUid).removeValue()
+}

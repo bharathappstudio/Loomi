@@ -14,11 +14,36 @@ class MessageListenerService : Service() {
     private val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
     private val listeners = mutableMapOf<String, ValueEventListener>()
     private var usersListener: ValueEventListener? = null
+    private var callsListener: ValueEventListener? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         NotificationHelper.createNotificationChannel(this)
         startListening()
+        listenForCalls()
         return START_STICKY
+    }
+
+    private fun listenForCalls() {
+        val auth = FirebaseAuth.getInstance()
+        val myUid = auth.currentUser?.uid ?: return
+
+        if (callsListener != null) return
+
+        callsListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val callData = snapshot.getValue(CallData::class.java)
+                if (callData != null && callData.status == "ringing") {
+                    NotificationHelper.showCallNotification(
+                        this@MessageListenerService,
+                        callData.callerId,
+                        callData.callerName,
+                        callData.callerImage
+                    )
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        database.child("calls").child(myUid).addValueEventListener(callsListener!!)
     }
 
     private fun startListening() {
@@ -86,6 +111,10 @@ class MessageListenerService : Service() {
 
     override fun onDestroy() {
         usersListener?.let { database.child("users").removeEventListener(it) }
+        callsListener?.let { 
+            val myUid = FirebaseAuth.getInstance().currentUser?.uid
+            if (myUid != null) database.child("calls").child(myUid).removeEventListener(it)
+        }
         listeners.forEach { (chatId, listener) ->
             database.child("chats").child(chatId).removeEventListener(listener)
         }
