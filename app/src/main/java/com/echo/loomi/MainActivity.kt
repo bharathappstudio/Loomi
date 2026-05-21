@@ -280,6 +280,8 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     
     var isSearchVisible by remember { mutableStateOf(false) }
     var isStoriesVisible by remember { mutableStateOf(false) }
+    var isOffline by remember { mutableStateOf(false) }
+    var isTrulyOffline by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
@@ -319,10 +321,21 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     }
 
     val blurProgress by animateFloatAsState(
-        targetValue = if (selectedStoryForSheet != null) 1f else 0f,
+        targetValue = if (selectedStoryForSheet != null || isTrulyOffline) 1f else 0f,
         animationSpec = tween(500),
         label = "sheet_blur"
     )
+
+    LaunchedEffect(isOffline) {
+        if (isOffline) {
+            delay(5000)
+            if (isOffline) {
+                isTrulyOffline = true
+            }
+        } else {
+            isTrulyOffline = false
+        }
+    }
 
     val currentUser = FirebaseAuth.getInstance().currentUser
     var currentUserImage by remember { mutableStateOf("") }
@@ -375,6 +388,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
         connectedRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val connected = snapshot.getValue(Boolean::class.java) ?: false
+                isOffline = !connected
                 if (connected) {
                     userStatusRef.setValue("Online")
                     userStatusRef.onDisconnect().setValue("Offline")
@@ -471,7 +485,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.fillMaxSize().blur(androidx.compose.ui.unit.lerp(0.dp, 17.dp, blurProgress)),
+            modifier = Modifier.fillMaxSize().blur(androidx.compose.ui.unit.lerp(0.dp, 25.dp, blurProgress)),
             containerColor = Color.White,
             topBar = {
                 Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
@@ -680,7 +694,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                 isStoriesVisible = !isStoriesVisible 
                 if (isStoriesVisible) isSearchVisible = false
             },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 45.dp).blur(androidx.compose.ui.unit.lerp(0.dp, 0.dp, blurProgress))
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 45.dp)
         )
 
         if (selectedStoryForSheet != null) {
@@ -689,6 +703,26 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                 cache = songUrlCache,
                 onDismiss = { selectedStoryForSheet = null }
             )
+        }
+
+        if (isTrulyOffline) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Transparent)
+                    .clickable(enabled = true, onClick = {}), // Block all clicks
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(
+                        painter = painterResource(id = R.drawable._404),
+                        contentDescription = "No Internet",
+                        modifier = Modifier.fillMaxWidth(0.7f),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+            }
         }
     }
 }
