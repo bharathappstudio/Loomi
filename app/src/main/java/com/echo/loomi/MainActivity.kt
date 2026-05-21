@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -48,6 +49,7 @@ import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -66,11 +68,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.text.format.DateUtils
+import android.util.Base64
+import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.asImageBitmap
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.echo.loomi.ui.theme.LoomiTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
+import java.net.HttpURLConnection
+import android.util.Log
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -185,6 +199,17 @@ data class SnapUser(
     val imageName: String
 )
 
+data class Story(
+    val id: String = "",
+    val uid: String = "",
+    val image: String = "", // Base64
+    val songId: Long = 0,
+    val songName: String = "",
+    val timestamp: Long = 0,
+    var userName: String = "",
+    var userProfileImage: String = ""
+)
+
 fun formatLastSeen(lastSeen: Long): String {
     if (lastSeen <= 0) return "Never"
     val now = System.currentTimeMillis()
@@ -203,7 +228,7 @@ fun formatLastSeen(lastSeen: Long): String {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
-    val pagerState = rememberPagerState(initialPage = 1) { 3 }
+    val pagerState = rememberPagerState(initialPage = 1) { 2 }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -239,27 +264,22 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
                     scope.launch {
                         pagerState.animateScrollToPage(0)
                     }
-                },
-                onStoryClick = {
-                    scope.launch {
-                        pagerState.animateScrollToPage(2)
-                    }
                 }
             )
-            2 -> StoryScreen(onBack = {
-                scope.launch {
-                    pagerState.animateScrollToPage(1)
-                }
-            })
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: () -> Unit, onStoryClick: () -> Unit) {
+fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: () -> Unit) {
     val usersList = remember { mutableStateListOf<SnapUser>() }
+    val storiesList = remember { mutableStateListOf<Story>() }
+    var selectedStoryForSheet by remember { mutableStateOf<Story?>(null) }
+    val songUrlCache = remember { mutableStateMapOf<Long, String>() }
+    
     var isSearchVisible by remember { mutableStateOf(false) }
+    var isStoriesVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
@@ -297,6 +317,12 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
             }
         }
     }
+
+    val blurProgress by animateFloatAsState(
+        targetValue = if (selectedStoryForSheet != null) 1f else 0f,
+        animationSpec = tween(500),
+        label = "sheet_blur"
+    )
 
     val currentUser = FirebaseAuth.getInstance().currentUser
     var currentUserImage by remember { mutableStateOf("") }
@@ -401,11 +427,51 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
             }
             override fun onCancelled(error: DatabaseError) {}
         })
+
+        // Fetch Stories for Top Row
+        database.child("stories").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val newStoriesList = mutableListOf<Story>()
+                for (child in snapshot.children) {
+                    val story = child.getValue(Story::class.java)
+                    if (story != null) {
+                        newStoriesList.add(story)
+                    }
+                }
+
+                // Get only the most recent story per user
+                val uniqueStories = newStoriesList.groupBy { it.uid }
+                    .map { it.value.maxBy { s -> s.timestamp } }
+                    .sortedByDescending { it.timestamp }
+
+                // Clear and add with user details
+                storiesList.clear()
+                uniqueStories.forEach { story ->
+                    database.child("users").child(story.uid).addListenerForSingleValueEvent(object : ValueEventListener {
+                        override fun onDataChange(userSnapshot: DataSnapshot) {
+                            val userName = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
+                            val userProfileImage = userSnapshot.child("imageName").getValue(String::class.java) ?: ""
+                            
+                            val updatedStory = story.copy(userName = userName, userProfileImage = userProfileImage)
+                            val index = storiesList.indexOfFirst { it.uid == story.uid }
+                            if (index != -1) {
+                                storiesList[index] = updatedStory
+                            } else {
+                                storiesList.add(updatedStory)
+                                storiesList.sortByDescending { it.timestamp }
+                            }
+                        }
+                        override fun onCancelled(error: DatabaseError) {}
+                    })
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().blur(androidx.compose.ui.unit.lerp(0.dp, 20.dp, blurProgress)),
             containerColor = Color.White,
             topBar = {
                 Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
@@ -528,6 +594,66 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
         ) { padding ->
             Box(modifier = Modifier.padding(padding).fillMaxSize()) {
                 LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 120.dp)) {
+                    // Stories Row at the Top
+                    item {
+                        AnimatedVisibility(
+                            visible = isStoriesVisible,
+                            enter = fadeIn(animationSpec = tween(300)) + expandVertically(),
+                            exit = fadeOut(animationSpec = tween(300)) + shrinkVertically()
+                        ) {
+                            Column {
+                                if (storiesList.isNotEmpty()) {
+                                    LazyRow(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(storiesList, key = { it.id }) { story ->
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                modifier = Modifier.clickable { selectedStoryForSheet = story }
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(68.dp)
+                                                        .clip(CircleShape)
+                                                        .border(2.dp, Color(0xFF81C995), CircleShape)
+                                                        .padding(3.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color.Gray.copy(alpha = 0.1f))
+                                                ) {
+                                                    AsyncImage(
+                                                        model = ImageRequest.Builder(context)
+                                                            .data("file:///android_asset/${story.userProfileImage}")
+                                                            .crossfade(true)
+                                                            .build(),
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = story.userName.split(" ").firstOrNull() ?: "",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = Color.Black.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    HorizontalDivider(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                        thickness = 0.5.dp,
+                                        color = Color.Black.copy(alpha = 0.08f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     items(items = filteredUsersList.value, key = { it.uid }) { user ->
                         SnapChatItem(user, onClick = {
                             val intent = Intent(context, MessageActivity::class.java).apply {
@@ -545,14 +671,190 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
 
         FloatingBottomNavBar(
             onCameraClick = onCameraClick,
-            onSearchClick = { isSearchVisible = !isSearchVisible },
+            onSearchClick = { 
+                isSearchVisible = !isSearchVisible 
+                if (isSearchVisible) isStoriesVisible = false
+            },
             onAddAccount = onAddAccount,
-            onStoryClick = onStoryClick,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 45.dp)
+            onStoryClick = { 
+                isStoriesVisible = !isStoriesVisible 
+                if (isStoriesVisible) isSearchVisible = false
+            },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 45.dp).blur(androidx.compose.ui.unit.lerp(0.dp, 0.dp, blurProgress))
         )
+
+        if (selectedStoryForSheet != null) {
+            StoryBottomSheet(
+                story = selectedStoryForSheet!!,
+                cache = songUrlCache,
+                onDismiss = { selectedStoryForSheet = null }
+            )
+        }
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StoryBottomSheet(
+    story: Story,
+    cache: MutableMap<Long, String>,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var songArtworkUrl by remember { mutableStateOf<String?>(null) }
+    var previewUrl by remember { mutableStateOf<String?>(cache[story.songId]) }
+    val sheetMediaPlayer = remember { MediaPlayer() }
+
+    val bitmap = remember(story.image) {
+        try {
+            val imageBytes = Base64.decode(story.image, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    val timeAgo = remember(story.timestamp) {
+        if (story.timestamp == 0L) ""
+        else DateUtils.getRelativeTimeSpanString(story.timestamp, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+    }
+
+    LaunchedEffect(story.songId) {
+        if (story.songId == 0L) return@LaunchedEffect
+        if (cache.containsKey(story.songId)) {
+            previewUrl = cache[story.songId]
+        }
+        
+        withContext(Dispatchers.IO) {
+            try {
+                val url = URL("https://itunes.apple.com/lookup?id=${story.songId}")
+                val connection = url.openConnection() as HttpURLConnection
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(response)
+                val results = json.getJSONArray("results")
+                if (results.length() > 0) {
+                    val item = results.getJSONObject(0)
+                    val pUrl = item.optString("previewUrl")
+                    previewUrl = pUrl
+                    cache[story.songId] = pUrl
+                    songArtworkUrl = item.optString("artworkUrl100").replace("100x100bb.jpg", "600x600bb.jpg")
+                }
+            } catch (e: Exception) {
+                Log.e("StorySheet", "Failed to fetch song details", e)
+            }
+        }
+    }
+
+    LaunchedEffect(previewUrl) {
+        previewUrl?.let { url ->
+            try {
+                sheetMediaPlayer.apply {
+                    stop()
+                    reset()
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build()
+                    )
+                    setDataSource(url)
+                    isLooping = true
+                    prepareAsync()
+                    setOnPreparedListener { start() }
+                }
+            } catch (e: Exception) {
+                Log.e("StorySheet", "Failed to play music in sheet", e)
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            sheetMediaPlayer.release()
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        containerColor = Color(0xFFFFF6DE),
+        scrimColor = Color.Transparent
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 60.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(modifier = Modifier.size(240.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black)
+                        .border(3.dp, Color.White, CircleShape)
+                ) {
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 10.dp, y = 10.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .border(1.5.dp, Color.White, RoundedCornerShape(20.dp))
+                        .background(Color(0xFFFFE0B2))
+                        .padding(horizontal = 30.dp, vertical = 15.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        startCall(story.uid, story.userName, story.userProfileImage)
+                        val intent = Intent(context, CallActivity::class.java).apply {
+                            putExtra("receiverUid", story.uid)
+                            putExtra("receiverName", story.userName)
+                            putExtra("receiverImage", story.userProfileImage)
+                            putExtra("isIncoming", false)
+                        }
+                        context.startActivity(intent)
+                    }, modifier = Modifier.size(24.dp)) {
+                        Icon(painterResource(R.drawable.call), null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    }
+                    Icon(painterResource(R.drawable.video), null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = (0.dp), y = (-10.dp))
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .border(2.dp, Color.White, RoundedCornerShape(15.dp))
+                        .background(Color(0xFFFFAB91))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(painterResource(R.drawable.musicnote), null, tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+            Text(
+                text = "Uploaded $timeAgo",
+                fontSize = 13.sp,
+                color = Color.Black.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
 
 @Composable
 fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {

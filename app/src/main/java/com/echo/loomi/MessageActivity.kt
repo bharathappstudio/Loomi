@@ -279,9 +279,12 @@ fun MessageScreen(
         }
 
         if (showCallSheet) {
+            val decryptedCallerName = activeCallData?.callerName?.let { EncryptionUtils.decrypt(it) } ?: "Unknown"
+            val decryptedCallerImage = activeCallData?.callerImage?.let { EncryptionUtils.decrypt(it) } ?: receiverImage
+
             CallBottomSheet(
-                receiverName = if (currentCallState == CallState.INCOMING) activeCallData?.callerName ?: "Unknown" else receiverName,
-                receiverImage = if (currentCallState == CallState.INCOMING) activeCallData?.callerImage ?: receiverImage else receiverImage,
+                receiverName = if (currentCallState == CallState.INCOMING) decryptedCallerName else receiverName,
+                receiverImage = if (currentCallState == CallState.INCOMING) decryptedCallerImage else receiverImage,
                 callState = currentCallState,
                 onAccept = {
                     database.child("calls").child(currentUid).child("status").setValue("accepted")

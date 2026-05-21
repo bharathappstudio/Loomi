@@ -33,11 +33,13 @@ class MessageListenerService : Service() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val callData = snapshot.getValue(CallData::class.java)
                 if (callData != null && callData.status == "ringing") {
+                    val decryptedName = EncryptionUtils.decrypt(callData.callerName)
+                    val decryptedImage = EncryptionUtils.decrypt(callData.callerImage)
                     NotificationHelper.showCallNotification(
                         this@MessageListenerService,
                         callData.callerId,
-                        callData.callerName,
-                        callData.callerImage
+                        decryptedName,
+                        decryptedImage
                     )
                 }
             }

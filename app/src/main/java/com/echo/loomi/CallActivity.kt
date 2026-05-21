@@ -89,9 +89,12 @@ fun CallScreenContent(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val decryptedName = if (isIncoming) EncryptionUtils.decrypt(receiverName) else receiverName
+        val decryptedImage = if (isIncoming) EncryptionUtils.decrypt(receiverImage) else receiverImage
+
         CallBottomSheet(
-            receiverName = receiverName,
-            receiverImage = receiverImage,
+            receiverName = decryptedName,
+            receiverImage = decryptedImage,
             callState = callState,
             onAccept = {
                 database.child("calls").child(currentUid).child("status").setValue("accepted")

@@ -164,11 +164,15 @@ fun startCall(receiverUid: String, receiverName: String, receiverImage: String) 
     val currentUid = auth.currentUser?.uid ?: return
     val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
 
+    // Encrypt metadata for privacy
+    val encryptedName = EncryptionUtils.encrypt("User") // Placeholder or actual name
+    val encryptedImage = EncryptionUtils.encrypt(receiverImage)
+
     val callData = CallData(
         callerId = currentUid,
         receiverId = receiverUid,
-        callerName = "You", // Ideally get current user's name
-        callerImage = "", // Ideally get current user's image
+        callerName = encryptedName,
+        callerImage = encryptedImage,
         status = "ringing"
     )
 
