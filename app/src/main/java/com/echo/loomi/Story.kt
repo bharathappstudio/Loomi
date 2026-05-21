@@ -110,6 +110,7 @@ fun StoryScreen(
     val scope = rememberCoroutineScope()
     val mediaPlayer = remember { MediaPlayer() }
     var currentPlayingId by remember { mutableStateOf<String?>(null) }
+    val songUrlCache = remember { mutableStateMapOf<Long, String>() }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -230,17 +231,6 @@ fun StoryScreen(
                         singleLine = true,
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
                     )
-
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(30.dp)) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.arrow___down_2), // Reusing existing icon for "clear" feel or just something to tap
-                                contentDescription = "Clear",
-                                modifier = Modifier.size(16.dp).graphicsLayer(rotationZ = 45f),
-                                tint = Color.Gray
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -266,7 +256,7 @@ fun StoryScreen(
                             } else {
                                 currentPlayingId = story.id
                                 scope.launch {
-                                    playStoryMusic(story, mediaPlayer) {
+                                    playStoryMusic(story, mediaPlayer, songUrlCache) {
                                         currentPlayingId = null
                                     }
                                 }
@@ -285,6 +275,7 @@ fun StoryScreen(
         if (selectedStoryForSheet != null) {
             StoryBottomSheet(
                 story = selectedStoryForSheet!!,
+                cache = songUrlCache,
                 onDismiss = { selectedStoryForSheet = null }
             )
         }
@@ -351,7 +342,7 @@ fun StoryItem(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painterResource(if (isPlaying) R.drawable.videocam else R.drawable.musicnote),
+                    painterResource(if (isPlaying) R.drawable.flass else R.drawable.musicnote),
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)
@@ -361,8 +352,16 @@ fun StoryItem(
     }
 }
 
-private suspend fun playStoryMusic(story: Story, mediaPlayer: MediaPlayer, onComplete: () -> Unit) {
+private suspend fun playStoryMusic(story: Story, mediaPlayer: MediaPlayer, cache: MutableMap<Long, String>, onComplete: () -> Unit) {
     if (story.songId == 0L) return
+
+    val cachedUrl = cache[story.songId]
+    if (cachedUrl != null) {
+        withContext(Dispatchers.Main) {
+            startMedia(mediaPlayer, cachedUrl, onComplete)
+        }
+        return
+    }
 
     withContext(Dispatchers.IO) {
         try {
@@ -373,25 +372,10 @@ private suspend fun playStoryMusic(story: Story, mediaPlayer: MediaPlayer, onCom
             val results = json.getJSONArray("results")
             if (results.length() > 0) {
                 val previewUrl = results.getJSONObject(0).getString("previewUrl")
+                cache[story.songId] = previewUrl
 
                 withContext(Dispatchers.Main) {
-                    mediaPlayer.stop()
-                    mediaPlayer.reset()
-                    mediaPlayer.setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .build()
-                    )
-                    mediaPlayer.setDataSource(previewUrl)
-                    mediaPlayer.prepareAsync()
-                    mediaPlayer.setOnPreparedListener {
-                        it.isLooping = false
-                        it.start()
-                    }
-                    mediaPlayer.setOnCompletionListener {
-                        onComplete()
-                    }
+                    startMedia(mediaPlayer, previewUrl, onComplete)
                 }
             }
         } catch (e: Exception) {
@@ -400,15 +384,40 @@ private suspend fun playStoryMusic(story: Story, mediaPlayer: MediaPlayer, onCom
     }
 }
 
+private fun startMedia(mediaPlayer: MediaPlayer, url: String, onComplete: () -> Unit) {
+    try {
+        mediaPlayer.stop()
+        mediaPlayer.reset()
+        mediaPlayer.setAudioAttributes(
+            AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .build()
+        )
+        mediaPlayer.setDataSource(url)
+        mediaPlayer.prepareAsync()
+        mediaPlayer.setOnPreparedListener {
+            it.isLooping = false
+            it.start()
+        }
+        mediaPlayer.setOnCompletionListener {
+            onComplete()
+        }
+    } catch (e: Exception) {
+        Log.e("StoryScreen", "Media player error", e)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StoryBottomSheet(
     story: Story,
+    cache: MutableMap<Long, String>,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     var songArtworkUrl by remember { mutableStateOf<String?>(null) }
-    var previewUrl by remember { mutableStateOf<String?>(null) }
+    var previewUrl by remember { mutableStateOf<String?>(cache[story.songId]) }
     val sheetMediaPlayer = remember { MediaPlayer() }
 
     val bitmap = remember(story.image) {
@@ -427,6 +436,14 @@ fun StoryBottomSheet(
 
     LaunchedEffect(story.songId) {
         if (story.songId == 0L) return@LaunchedEffect
+        if (cache.containsKey(story.songId)) {
+            // Only need to fetch artwork if we already have previewUrl
+            // But usually we fetch both together. For speed, let's skip lookup if cached
+            // and just use a default or separate artwork cache.
+            // For now, let's just use the cached previewUrl.
+            previewUrl = cache[story.songId]
+        }
+        
         withContext(Dispatchers.IO) {
             try {
                 val url = URL("https://itunes.apple.com/lookup?id=${story.songId}")
@@ -436,7 +453,9 @@ fun StoryBottomSheet(
                 val results = json.getJSONArray("results")
                 if (results.length() > 0) {
                     val item = results.getJSONObject(0)
-                    previewUrl = item.optString("previewUrl")
+                    val pUrl = item.optString("previewUrl")
+                    previewUrl = pUrl
+                    cache[story.songId] = pUrl
                     songArtworkUrl = item.optString("artworkUrl100").replace("100x100bb.jpg", "600x600bb.jpg")
                 }
             } catch (e: Exception) {

@@ -194,16 +194,16 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
 
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(700)
+            kotlinx.coroutines.delay(400) // Faster cycle
             colorIndex1 = (colorIndex1 + 1) % googleColors.size
             colorIndex2 = (colorIndex2 + 1) % googleColors.size
             colorIndex3 = (colorIndex3 + 1) % googleColors.size
         }
     }
 
-    val c1 by animateColorAsState(googleColors[colorIndex1], tween(600), label = "c1")
-    val c2 by animateColorAsState(googleColors[colorIndex2], tween(600), label = "c2")
-    val c3 by animateColorAsState(googleColors[colorIndex3], tween(600), label = "c3")
+    val c1 by animateColorAsState(googleColors[colorIndex1], tween(300), label = "c1")
+    val c2 by animateColorAsState(googleColors[colorIndex2], tween(300), label = "c2")
+    val c3 by animateColorAsState(googleColors[colorIndex3], tween(300), label = "c3")
 
     DisposableEffect(Unit) {
         onDispose {
@@ -545,6 +545,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
 
             LaunchedEffect(musicSearchQuery) {
                 if (musicSearchQuery.length > 2) {
+                    kotlinx.coroutines.delay(300) // Debounce search
                     isSearching = true
                     musicResults = searchMusic(musicSearchQuery)
                     isSearching = false
@@ -558,20 +559,13 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .padding(horizontal = 15.dp, vertical = 10.dp)
                     .navigationBarsPadding()
             ) {
-                Text(
-                    text = "Add Music",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 15.dp)
-                )
-                
                 TextField(
                     value = musicSearchQuery,
                     onValueChange = { musicSearchQuery = it },
-                    placeholder = { Text("Search songs or artists...") },
+                    placeholder = { Text("Search tracks...") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
@@ -600,7 +594,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                         modifier = Modifier.fillMaxWidth().height(300.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Search for your favorite tracks", color = Color.Gray)
+                        Text("Search for favorite tracks", color = Color.Gray)
                     }
                 } else {
                     LazyColumn(
@@ -645,11 +639,6 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
                                     )
-                                    if (currentPlayingUrl == track.previewUrl) {
-                                        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(0.4f)), contentAlignment = Alignment.Center) {
-                                            Icon(painterResource(R.drawable.videocam), null, tint = Color.White, modifier = Modifier.size(24.dp))
-                                        }
-                                    }
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -668,7 +657,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                                         modifier = Modifier.size(40.dp)
                                     ) {
                                         Icon(
-                                            painter = painterResource(R.drawable.call),
+                                            painter = painterResource(R.drawable.musicnote),
                                             contentDescription = "Select",
                                             modifier = Modifier.size(24.dp),
                                             tint = Color.Green
@@ -757,39 +746,30 @@ private suspend fun uploadToStory(context: Context, uri: Uri, songId: Long?, son
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
             val base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
             
-            // First, delete any existing stories for this user to ensure only one exists
-            database.child("stories").orderByChild("uid").equalTo(currentUid).get().addOnSuccessListener { snapshot ->
-                for (child in snapshot.children) {
-                    child.ref.removeValue()
+            val storyId = currentUid // Use UID as the story ID
+            val storyData = mapOf(
+                "id" to storyId,
+                "uid" to currentUid,
+                "image" to base64Image,
+                "songId" to (songId ?: 0),
+                "songName" to (songName ?: "None"),
+                "timestamp" to ServerValue.TIMESTAMP
+            )
+            
+            // Overwrite directly (much faster than fetch-and-delete)
+            database.child("stories").child(storyId).setValue(storyData)
+                .addOnSuccessListener {
+                    Toast.makeText(context, "Story uploaded successfully", Toast.LENGTH_SHORT).show()
+                    // Clean up temporary file if it exists in cache
+                    if (uri.toString().contains(context.cacheDir.path)) {
+                        File(uri.path ?: "").delete()
+                    }
+                    onComplete()
                 }
-
-                val storyId = currentUid // Use UID as the story ID
-                val storyData = mapOf(
-                    "id" to storyId,
-                    "uid" to currentUid,
-                    "image" to base64Image,
-                    "songId" to (songId ?: 0),
-                    "songName" to (songName ?: "None"),
-                    "timestamp" to ServerValue.TIMESTAMP
-                )
-                
-                database.child("stories").child(storyId).setValue(storyData)
-                    .addOnSuccessListener {
-                        Toast.makeText(context, "Story uploaded successfully", Toast.LENGTH_SHORT).show()
-                        // Clean up temporary file if it exists in cache
-                        if (uri.toString().contains(context.cacheDir.path)) {
-                            File(uri.path ?: "").delete()
-                        }
-                        onComplete()
-                    }
-                    .addOnFailureListener {
-                        Toast.makeText(context, "Story upload failed", Toast.LENGTH_SHORT).show()
-                        onComplete()
-                    }
-            }.addOnFailureListener {
-                Log.e("CameraView", "Failed to clean up old stories", it)
-                onComplete()
-            }
+                .addOnFailureListener {
+                    Toast.makeText(context, "Story upload failed", Toast.LENGTH_SHORT).show()
+                    onComplete()
+                }
         } catch (e: Exception) {
             Log.e("CameraView", "Error uploading story", e)
             withContext(Dispatchers.Main) {
