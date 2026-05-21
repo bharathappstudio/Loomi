@@ -232,17 +232,6 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Privacy Protocol: Dynamically block screenshots and stop camera when not visible
-    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-        val window = (context as? android.app.Activity)?.window ?: return@LaunchedEffect
-        val isCameraActive = pagerState.currentPage == 0 || pagerState.isScrollInProgress
-        if (isCameraActive) {
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-        } else {
-            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-        }
-    }
-
     HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize(),
