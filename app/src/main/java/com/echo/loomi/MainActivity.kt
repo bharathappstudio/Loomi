@@ -471,7 +471,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.fillMaxSize().blur(androidx.compose.ui.unit.lerp(0.dp, 20.dp, blurProgress)),
+            modifier = Modifier.fillMaxSize().blur(androidx.compose.ui.unit.lerp(0.dp, 17.dp, blurProgress)),
             containerColor = Color.White,
             topBar = {
                 Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
