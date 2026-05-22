@@ -15,10 +15,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -162,6 +164,7 @@ fun BlackLoginUI(
     onLoginClick: () -> Unit,
     onBackWhileLoading: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     BackHandler(enabled = loading) {
         onBackWhileLoading()
     }
@@ -213,7 +216,7 @@ fun BlackLoginUI(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp))
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .navigationBarsPadding()
                     .padding(horizontal = 24.dp, vertical = 26.dp)
             ) {
@@ -223,7 +226,7 @@ fun BlackLoginUI(
                         .width(40.dp)
                         .height(5.dp)
                         .clip(RoundedCornerShape(100))
-                        .background(Color(0xFF2A2A2A))
+                        .background(if (isDark) Color.White.copy(0.2f) else Color(0xFF2A2A2A))
                 )
 
                 Spacer(modifier = Modifier.height(22.dp))
@@ -255,7 +258,7 @@ fun BlackLoginUI(
                             .fillMaxWidth()
                             .height(56.dp)
                             .clip(RoundedCornerShape(30.dp))
-                            .background(Color(0xFF1C1C1C))
+                            .background(if (isDark) Color.White else Color(0xFF1C1C1C))
                             .clickable { onLoginClick() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -273,7 +276,7 @@ fun BlackLoginUI(
                                 text = "Continue with Google",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color.White
+                                color = if (isDark) Color.Black else Color.White
                             )
                         }
                     }

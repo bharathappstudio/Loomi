@@ -3,6 +3,7 @@ package com.echo.loomi
 import android.util.Base64
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -49,9 +50,10 @@ fun CallBottomSheet(
     onEnd: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
@@ -87,7 +89,7 @@ fun CallBottomSheet(
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
-                    .border(2.dp, Color.Black.copy(alpha = 0.1f), CircleShape),
+                    .border(2.dp, if (isDark) Color.White.copy(0.2f) else Color.Black.copy(alpha = 0.1f), CircleShape),
                 contentScale = ContentScale.Crop,
                 error = painterResource(R.drawable.logo)
             )
@@ -99,7 +101,7 @@ fun CallBottomSheet(
                 text = receiverName,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -114,7 +116,7 @@ fun CallBottomSheet(
                     CallState.IDLE -> ""
                 },
                 fontSize = 16.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
 
             Spacer(modifier = Modifier.height(40.dp))

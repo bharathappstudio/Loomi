@@ -20,6 +20,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -127,7 +128,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFC8E6C9))
+            .background(if (isSystemInDarkTheme()) Color.Black else Color(0xFFC8E6C9))
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -147,8 +148,8 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                         modifier = Modifier
                             .size(180.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.4f))///
-                            .border(4.dp, Color.White, CircleShape),
+                            .background(if (isSystemInDarkTheme()) Color.White.copy(0.1f) else Color.White.copy(alpha = 0.4f))
+                            .border(4.dp, if (isSystemInDarkTheme()) Color.White.copy(0.2f) else Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         if (isProfileLoading) {
@@ -193,7 +194,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp))
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .navigationBarsPadding()
                     .padding(horizontal = 24.dp, vertical = 26.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -210,12 +211,12 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFF5F5F5))
+                            .background(if (isSystemInDarkTheme()) Color.White.copy(0.1f) else Color(0xFFF5F5F5))
                             .border(1.dp, Color.LightGray.copy(0.3f), CircleShape)
                             .clickable { galleryLauncher.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(painterResource(R.drawable.image), null, modifier = Modifier.size(24.dp), tint = Color.Black)
+                        Icon(painterResource(R.drawable.image), null, modifier = Modifier.size(24.dp), tint = if (isSystemInDarkTheme()) Color.White else Color.Black)
                     }
 
                     Spacer(modifier = Modifier.width(24.dp))
@@ -226,10 +227,10 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFF5F5F5))
+                            .background(if (isSystemInDarkTheme()) Color.White.copy(0.1f) else Color(0xFFF5F5F5))
                             .border(
                                 width = if (customImageUri?.toString()?.contains("google") == true) 2.dp else 1.dp,
-                                color = if (customImageUri?.toString()?.contains("google") == true) Color.Black else Color.LightGray.copy(0.3f),
+                                color = if (customImageUri?.toString()?.contains("google") == true) (if (isSystemInDarkTheme()) Color.White else Color.Black) else Color.LightGray.copy(0.3f),
                                 shape = CircleShape
                             )
                             .clickable {
@@ -262,7 +263,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                                 .weight(1f)
                                 .height(48.dp)
                                 .clip(RoundedCornerShape(24.dp))
-                                .background(if (isSelected) Color.Black else Color(0xFFF5F5F5))
+                                .background(if (isSelected) (if (isSystemInDarkTheme()) Color.White else Color.Black) else (if (isSystemInDarkTheme()) Color.White.copy(0.1f) else Color(0xFFF5F5F5)))
                                 .clickable {
                                     if (selectedGender != gender) {
                                         scope.launch {
@@ -279,7 +280,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                         ) {
                             Text(
                                 text = gender,
-                                color = if (isSelected) Color.White else Color.Black,
+                                color = if (isSelected) (if (isSystemInDarkTheme()) Color.Black else Color.White) else (if (isSystemInDarkTheme()) Color.White else Color.Black),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 15.sp
                             )
@@ -301,7 +302,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                                 .clip(CircleShape)
                                 .border(
                                     width = if (isSelected) 3.dp else 1.dp,
-                                    color = if (isSelected) Color.Black else Color.LightGray.copy(alpha = 0.5f),
+                                    color = if (isSelected) (if (isSystemInDarkTheme()) Color.White else Color.Black) else Color.LightGray.copy(alpha = 0.5f),
                                     shape = CircleShape
                                 )
                                 .clickable {
@@ -361,7 +362,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                             .fillMaxWidth()
                             .height(56.dp)
                             .clip(RoundedCornerShape(30.dp))
-                            .background(Color(0xFF1C1C1C))
+                            .background(if (isSystemInDarkTheme()) Color.White else Color(0xFF1C1C1C))
                             .clickable {
                                 if (isLoading) return@clickable
                                 isLoading = true
@@ -425,7 +426,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                             text = "Let's Go!",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = if (isSystemInDarkTheme()) Color.Black else Color.White
                         )
                     }
                 }

@@ -30,6 +30,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -87,6 +88,7 @@ data class MusicTrack(
 
 @Composable
 fun CameraScreen(isActive: Boolean, onBack: () -> Unit) {
+    val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -138,7 +140,7 @@ fun CameraScreen(isActive: Boolean, onBack: () -> Unit) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFEFB600))) {
+    Box(modifier = Modifier.fillMaxSize().background(if (isDark) Color.Black else Color(0xFFEFB600))) {
         if (hasCameraPermission) {
             CameraView(
                 isActive = isActive,
@@ -151,7 +153,7 @@ fun CameraScreen(isActive: Boolean, onBack: () -> Unit) {
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "Camera permission is required", color = Color.Black)
+                    Text(text = "Camera permission is required", color = if (isDark) Color.White else Color.Black)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
                         Text("Grant Permission")
@@ -165,6 +167,7 @@ fun CameraScreen(isActive: Boolean, onBack: () -> Unit) {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> Unit, currentUserImageAsset: String) {
+    val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
@@ -293,7 +296,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
         }, ContextCompat.getMainExecutor(context))
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFFFBF6))) {
+    Box(modifier = Modifier.fillMaxSize().background(if (isDark) Color.Black else Color(0xFFFFFBF6))) {
 
         // --- CENTERED OVERLAY GROUP ---
         Box(modifier = Modifier.align(Alignment.Center)) {
@@ -303,6 +306,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                     .size(200.dp)
                     .clip(CircleShape)
                     .background(Color.Black)
+                    .border(2.dp, if (isDark) Color.White.copy(0.2f) else Color.Transparent, CircleShape)
             ) {
                 if (selectedPreviewUri != null) {
                     val previewModel = remember(selectedPreviewUri) {
@@ -338,14 +342,14 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                     .align(Alignment.TopEnd)
                     .offset(x = 20.dp, y = (-10).dp)
                     .clip(RoundedCornerShape(25.dp))
-                    .border(2.dp, Color.White, RoundedCornerShape(25.dp))
-                    .background(Color(0xFFFFE0B2))
+                    .border(2.dp, if (isDark) Color.White.copy(0.3f) else Color.White, RoundedCornerShape(25.dp))
+                    .background(if (isDark) Color(0xFF1A1A1A) else Color(0xFFFFE0B2))
                     .padding(horizontal = 30.dp, vertical = 15.dp),
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(painterResource(R.drawable.call), contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                Icon(painterResource(R.drawable.video), contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                Icon(painterResource(R.drawable.call), contentDescription = null, tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(16.dp))
+                Icon(painterResource(R.drawable.video), contentDescription = null, tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(16.dp))
             }
 
             // 3. Bottom-Left Rounded Square (Music)
@@ -355,8 +359,8 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                     .offset(x = (-15).dp, y = 15.dp)
                     .size(65.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .border(2.dp, Color.White, RoundedCornerShape(16.dp))
-                    .background(Color(0xFFFFAB91))
+                    .border(2.dp, if (isDark) Color.White.copy(0.3f) else Color.White, RoundedCornerShape(16.dp))
+                    .background(if (isDark) Color(0xFF2A2A2A) else Color(0xFFFFAB91))
                     .clickable { showMusicSheet = true }
                     .padding(10.dp),
                 contentAlignment = Alignment.Center
@@ -378,9 +382,9 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                 .statusBarsPadding()
                 .padding(16.dp)
                 .align(Alignment.TopStart)
-                .background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+                .background(if (isDark) Color.White.copy(0.15f) else Color.Gray.copy(alpha = 0.1f), CircleShape)
         ) {
-            Icon(painterResource(R.drawable.arrow_left), contentDescription = "Close", tint = Color.Black, modifier = Modifier.size(20.dp))
+            Icon(painterResource(R.drawable.arrow_left), contentDescription = "Close", tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(20.dp))
         }
 
         IconButton(
@@ -394,12 +398,12 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                 .statusBarsPadding()
                 .padding(16.dp)
                 .align(Alignment.TopEnd)
-                .background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+                .background(if (isDark) Color.White.copy(0.15f) else Color.Gray.copy(alpha = 0.1f), CircleShape)
         ) {
             Icon(
                 painterResource(R.drawable.flass),
                 contentDescription = "Flash",
-                tint = Color.Black,
+                tint = if (isDark) Color.White else Color.Black,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -424,7 +428,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color.Gray.copy(alpha = 0.1f))
+                        .background(if (isDark) Color.White.copy(0.15f) else Color.Gray.copy(alpha = 0.1f))
                         .clickable {
                             if (currentUserImageAsset.isNotEmpty()) {
                                 val path = if (currentUserImageAsset.startsWith("data:image") || currentUserImageAsset.startsWith("http")) {
@@ -467,7 +471,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                     modifier = Modifier
                         .size(50.dp)
                         .clip(CircleShape)
-                        .background(Color.Black)
+                        .background(if (isDark) Color.White else Color.Black)
                         .clickable { selectedPreviewUri = null },
                     contentAlignment = Alignment.Center
                 ) {
@@ -475,7 +479,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                         painterResource(R.drawable.camera),
                         contentDescription = null,
                         modifier = Modifier.size(28.dp),
-                        tint = Color.White
+                        tint = if (isDark) Color.Black else Color.White
                     )
                 }
 
@@ -485,7 +489,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color.Gray.copy(alpha = 0.1f))
+                        .background(if (isDark) Color.White.copy(0.15f) else Color.Gray.copy(alpha = 0.1f))
                         .clickable {
                             currentUser?.photoUrl?.let { 
                                 val highResUrl = it.toString().replace("s96-c", "s4000")
@@ -510,9 +514,9 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
             ) {
                 IconButton(
                     onClick = { galleryLauncher.launch("image/*") },
-                    modifier = Modifier.size(50.dp).background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+                    modifier = Modifier.size(50.dp).background(if (isDark) Color.White.copy(0.15f) else Color.Gray.copy(alpha = 0.1f), CircleShape)
                 ) {
-                    Icon(painterResource(R.drawable.image), contentDescription = "Gallery", tint = Color.Black, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(R.drawable.image), contentDescription = "Gallery", tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(20.dp))
                 }
 
                 // Capture/Upload button
@@ -580,9 +584,9 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                             CameraSelector.LENS_FACING_BACK
                         }
                     },
-                    modifier = Modifier.size(50.dp).background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+                    modifier = Modifier.size(50.dp).background(if (isDark) Color.White.copy(0.15f) else Color.Gray.copy(alpha = 0.1f), CircleShape)
                 ) {
-                    Icon(painterResource(R.drawable.camera), contentDescription = "Flip", tint = Color.Black, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(R.drawable.camera), contentDescription = "Flip", tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -592,7 +596,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
         ModalBottomSheet(
             onDismissRequest = { showMusicSheet = false },
             sheetState = sheetState,
-            containerColor = Color.White,
+            containerColor = if (isDark) Color(0xFF121212) else Color.White,
             dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             var musicSearchQuery by remember { mutableStateOf("") }
@@ -629,24 +633,27 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                 TextField(
                     value = musicSearchQuery,
                     onValueChange = { musicSearchQuery = it },
-                    placeholder = { Text("Search tracks...") },
+                    placeholder = { Text("Search tracks...", color = if (isDark) Color.White.copy(0.4f) else Color.Gray) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                         .clip(RoundedCornerShape(28.dp)),
                     leadingIcon = { 
                         if (isSearching) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.Black)
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = if (isDark) Color.White else Color.Black)
                         } else {
-                            Icon(painterResource(R.drawable.search), null, modifier = Modifier.size(20.dp), tint = Color.Black)
+                            Icon(painterResource(R.drawable.search), null, modifier = Modifier.size(20.dp), tint = if (isDark) Color.White else Color.Black)
                         }
                     },
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFFF5F5F5),
-                        unfocusedContainerColor = Color(0xFFF5F5F5),
-                        disabledContainerColor = Color(0xFFF5F5F5),
+                        focusedContainerColor = if (isDark) Color.White.copy(0.1f) else Color(0xFFF5F5F5),
+                        unfocusedContainerColor = if (isDark) Color.White.copy(0.1f) else Color(0xFFF5F5F5),
+                        disabledContainerColor = if (isDark) Color.White.copy(0.1f) else Color(0xFFF5F5F5),
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
+                        cursorColor = if (isDark) Color.White else Color.Black,
+                        focusedTextColor = if (isDark) Color.White else Color.Black,
+                        unfocusedTextColor = if (isDark) Color.White else Color.Black
                     ),
                     singleLine = true
                 )
@@ -658,7 +665,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                         modifier = Modifier.fillMaxWidth().height(300.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Search for favorite tracks", color = Color.Gray)
+                        Text("Search for favorite tracks", color = if (isDark) Color.White.copy(0.4f) else Color.Gray)
                     }
                 } else {
                     LazyColumn(
@@ -696,7 +703,7 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)).background(Color.LightGray)) {
+                                Box(modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)).background(if (isDark) Color.White.copy(0.1f) else Color.LightGray)) {
                                     coil.compose.AsyncImage(
                                         model = track.artworkUrl,
                                         contentDescription = null,
@@ -706,8 +713,8 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(track.trackName, fontWeight = FontWeight.Bold, maxLines = 1)
-                                    Text(track.artistName, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1)
+                                    Text(track.trackName, fontWeight = FontWeight.Bold, maxLines = 1, color = if (isDark) Color.White else Color.Black)
+                                    Text(track.artistName, style = MaterialTheme.typography.bodySmall, color = if (isDark) Color.White.copy(0.6f) else Color.Gray, maxLines = 1)
                                 }
                                 
                                 // Selection Icon (Tap this to lock song and close sheet)

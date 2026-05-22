@@ -19,6 +19,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
+import com.echo.loomi.ui.theme.LoomiTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -78,7 +80,7 @@ class Setting : ComponentActivity() {
         val googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         setContent {
-            MaterialTheme {
+            LoomiTheme {
                 SettingUI(
                     onLogout = {
                         FirebaseAuth.getInstance().signOut()
@@ -102,6 +104,7 @@ class Setting : ComponentActivity() {
 @Composable
 fun SettingUI(onLogout: () -> Unit) {
 
+    val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
@@ -152,7 +155,7 @@ fun SettingUI(onLogout: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFFFFFF))
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars)
             .verticalScroll(scrollState)
             .navigationBarsPadding()
@@ -163,10 +166,11 @@ fun SettingUI(onLogout: () -> Unit) {
             Icon(
                 Icons.Default.ArrowBack,
                 contentDescription = null,
-                modifier = Modifier.clickable { (context as? ComponentActivity)?.finish() }
+                modifier = Modifier.clickable { (context as? ComponentActivity)?.finish() },
+                tint = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.width(16.dp))
-            Text("Settings", fontSize = 20.sp, fontWeight = FontWeight.Medium)
+            Text("Settings", fontSize = 20.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
         }
 
         Spacer(Modifier.height(28.dp))
@@ -207,14 +211,14 @@ fun SettingUI(onLogout: () -> Unit) {
                             AsyncImage(
                                 model = photoUrl,
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                modifier = Modifier.fillMaxSize().clip(CircleShape).border(1.dp, if (isDark) Color.White.copy(0.2f) else Color.Transparent, CircleShape)
                             )
                         } else {
                             Box(
-                                modifier = Modifier.fillMaxSize().clip(CircleShape).background(Color(0xFFF9FBE7)),
+                                modifier = Modifier.fillMaxSize().clip(CircleShape).background(if (isDark) Color.White.copy(0.1f) else Color(0xFFF9FBE7)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(name.first().toString(), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                Text(name.first().toString(), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     }
@@ -224,8 +228,8 @@ fun SettingUI(onLogout: () -> Unit) {
             Spacer(Modifier.width(16.dp))
 
             Column {
-                Text(name, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-                Text(email, fontSize = 14.sp, color = Color(0xFF6B6B6B))
+                Text(name, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                Text(email, fontSize = 14.sp, color = if (isDark) Color.White.copy(0.6f) else Color(0xFF6B6B6B))
             }
         }
 
@@ -243,20 +247,20 @@ fun SettingUI(onLogout: () -> Unit) {
                 .fillMaxWidth()
                 .height(110.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .border(2.dp, Color.White, RoundedCornerShape(20.dp))
-                .background(Color(0xFFE8F5E9))
+                .border(2.dp, if (isDark) Color.White.copy(0.1f) else Color.White, RoundedCornerShape(20.dp))
+                .background(if (isDark) Color(0xFF1B1F1C) else Color(0xFFE8F5E9))
                 // .clickable { context.startActivity(Intent(context, EchoWeb::class.java)) }
         ) {
-            val bubbleColor = Color(0xFFFFFFFF).copy(alpha = 0.75f)
+            val bubbleColor = if (isDark) Color.White.copy(0.05f) else Color(0xFFFFFFFF).copy(alpha = 0.75f)
             Box(Modifier.size(22.dp).offset(30.dp + side1.dp, up1.dp).background(bubbleColor, CircleShape))
             Box(Modifier.size(18.dp).offset(70.dp, up2.dp).background(bubbleColor, CircleShape))
             Box(Modifier.size(14.dp).offset(120.dp + side2.dp, up1.dp + 30.dp).background(bubbleColor, CircleShape))
             Box(Modifier.size(26.dp).offset(160.dp, up2.dp + 50.dp).background(bubbleColor, CircleShape))
 
             Column(Modifier.fillMaxSize().padding(16.dp)) {
-                Text("Get the best of Echo 🫐", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("Get the best of Echo 🫐", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(4.dp))
-                Text("Higher limits, cloud storage, in Realtime Database Echo built in Ai", fontSize = 13.sp, color = Color(0xCC4E4E4E))
+                Text("Higher limits, cloud storage, in Realtime Database Echo built in Ai", fontSize = 13.sp, color = if (isDark) Color.White.copy(0.6f) else Color(0xCC4E4E4E))
             }
         }
 
@@ -280,6 +284,7 @@ fun SettingUI(onLogout: () -> Unit) {
 
 @Composable
 fun SettingRow(title: String, isNew: Boolean = false, onClick: () -> Unit) {
+    val isDark = isSystemInDarkTheme()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -287,18 +292,18 @@ fun SettingRow(title: String, isNew: Boolean = false, onClick: () -> Unit) {
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, modifier = Modifier.weight(1f), fontSize = 16.sp)
+        Text(title, modifier = Modifier.weight(1f), fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
         if (isNew) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xCCA5D6A7))
+                    .background(if (isDark) Color(0xFF2E7D32).copy(0.4f) else Color(0xCCA5D6A7))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("NEW", fontSize = 11.sp)
+                Text("NEW", fontSize = 11.sp, color = if (isDark) Color.White else Color.Black)
             }
             Spacer(Modifier.width(8.dp))
         }
-        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = Color(0x80171616))
+        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = if (isDark) Color.White.copy(0.4f) else Color(0x80171616))
     }
 }

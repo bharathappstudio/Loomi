@@ -110,6 +110,7 @@ fun MessageScreen(
     receiverImage: String,
     onBack: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     val auth = FirebaseAuth.getInstance()
     val currentUid = auth.currentUser?.uid ?: return
     val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
@@ -219,7 +220,7 @@ fun MessageScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Background
-        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFFF3E0)))
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
 
         Column(modifier = Modifier
             .fillMaxSize()
@@ -324,9 +325,10 @@ fun MessageTopBar(
     onBack: () -> Unit,
     onCallClick: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.95f),
+        color = MaterialTheme.colorScheme.surface,
     ) {
         Column {
             Row(
@@ -344,7 +346,7 @@ fun MessageTopBar(
                     Icon(
                         painter = painterResource(R.drawable.arrow_left),
                         contentDescription = "Back",
-                        tint = Color.Black.copy(alpha = 0.7f)
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 }
                 
@@ -376,7 +378,7 @@ fun MessageTopBar(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .border(1.dp, Color.Black.copy(alpha = 0.05f), CircleShape),
+                        .border(1.dp, if (isDark) Color.White.copy(0.2f) else Color.Black.copy(alpha = 0.05f), CircleShape),
                     contentScale = ContentScale.Crop,
                     error = painterResource(R.drawable.logo)
                 )
@@ -388,7 +390,7 @@ fun MessageTopBar(
                         text = receiverName,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                         letterSpacing = 0.5.sp
                     )
                 }
@@ -398,7 +400,7 @@ fun MessageTopBar(
                         Icon(
                             painter = painterResource(R.drawable.call),
                             contentDescription = "Call",
-                            tint = Color.Black.copy(alpha = 0.7f),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -407,7 +409,7 @@ fun MessageTopBar(
                         Icon(
                             painter = painterResource(R.drawable.video),
                             contentDescription = "Video Call",
-                            tint = Color.Black.copy(alpha = 0.7f),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -417,7 +419,7 @@ fun MessageTopBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(0.5.dp)
-                    .background(Color.Black.copy(alpha = 0.08f))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             )
         }
     }
@@ -448,7 +450,12 @@ fun FloatingBottomNavBar(
 
     val horizontalPadding = androidx.compose.ui.unit.lerp(80.dp, 10.dp, animProgress)
     val barHeight = androidx.compose.ui.unit.lerp(50.dp, 60.dp, animProgress)
-    val bgColor = androidx.compose.ui.graphics.lerp(Color(0xFFFFF2D9), Color.White.copy(0.55f), animProgress)
+    val isDark = isSystemInDarkTheme()
+    val bgColor = if (isDark) {
+        androidx.compose.ui.graphics.lerp(Color(0xFF1A1A1A), Color(0xFF121212).copy(0.7f), animProgress)
+    } else {
+        androidx.compose.ui.graphics.lerp(Color(0xFFFFF2D9), Color.White.copy(0.55f), animProgress)
+    }
     val borderAlpha = androidx.compose.ui.util.lerp(0.8f, 0.3f, animProgress)
 
     Box(
@@ -470,13 +477,14 @@ fun FloatingBottomNavBar(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val iconColor = if (isDark) Color.White else Color.Black
             if (animProgress < 0.5f) {
                 // Icons Mode
                 IconButton(
                     onClick = onCameraClick,
                     modifier = Modifier.size(36.dp).graphicsLayer(alpha = 1f - animProgress * 2)
                 ) {
-                    Icon(painterResource(R.drawable.camera), null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(R.drawable.camera), null, tint = iconColor, modifier = Modifier.size(20.dp))
                 }
                 
                 Spacer(modifier = Modifier.width(20.dp))
@@ -485,7 +493,7 @@ fun FloatingBottomNavBar(
                     onClick = { onExpandedChange(true) },
                     modifier = Modifier.size(36.dp).graphicsLayer(alpha = 1f - animProgress * 2)
                 ) {
-                    Icon(painterResource(R.drawable.keyboard_keys_25dp_1f1f1f_fill0_wght400_grad0_opsz24), null, tint = Color.Black, modifier = Modifier.size(22.dp))
+                    Icon(painterResource(R.drawable.keyboard_keys_25dp_1f1f1f_fill0_wght400_grad0_opsz24), null, tint = iconColor, modifier = Modifier.size(22.dp))
                 }
 
                 Spacer(modifier = Modifier.width(20.dp))
@@ -494,7 +502,7 @@ fun FloatingBottomNavBar(
                     onClick = onSearchClick,
                     modifier = Modifier.size(36.dp).graphicsLayer(alpha = 1f - animProgress * 2)
                 ) {
-                    Icon(painterResource(R.drawable.search), null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(R.drawable.search), null, tint = iconColor, modifier = Modifier.size(20.dp))
                 }
             } else {
                 // Input Mode
@@ -507,7 +515,7 @@ fun FloatingBottomNavBar(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(0.35f)) // Slightly stronger glass look
+                            .background(if (isDark) Color.White.copy(0.1f) else Color.White.copy(0.35f))
                             .clickable { onExpandedChange(false) },
                         contentAlignment = Alignment.Center
                     ) {
@@ -515,7 +523,7 @@ fun FloatingBottomNavBar(
                             painter = painterResource(R.drawable.arrow___down_2),
                             contentDescription = null,
                             modifier = Modifier.size(22.dp), // Slightly smaller for premium feel
-                            tint = Color.Unspecified
+                            tint = if (isDark) Color.White else Color.Unspecified
                         )
                     }
 
@@ -588,6 +596,7 @@ fun FloatingBottomNavBar(
 
 @Composable
 fun ChatBubble(msg: ChatMessage, isMe: Boolean) {
+    val isDark = isSystemInDarkTheme()
     val bubbleShape = RoundedCornerShape(
         topStart = 22.dp,
         topEnd = 22.dp,
@@ -602,8 +611,8 @@ fun ChatBubble(msg: ChatMessage, isMe: Boolean) {
             modifier = Modifier
                 .widthIn(max = 300.dp)
                 .clip(bubbleShape)
-                .background(if (isMe) Color(0x66C8E6C9) else Color(0x80FFECB3).copy(alpha = 0.45f))
-                .border(1.dp, Color.White.copy(alpha = 0.80f), bubbleShape)
+                .background(if (isMe) (if (isDark) Color.White.copy(0.2f) else Color(0x66C8E6C9)) else (if (isDark) Color.White.copy(0.1f) else Color(0x80FFECB3).copy(alpha = 0.45f)))
+                .border(1.dp, Color.White.copy(alpha = if (isDark) 0.1f else 0.80f), bubbleShape)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             if (msg.message.startsWith("img:")) {
@@ -629,7 +638,7 @@ fun ChatBubble(msg: ChatMessage, isMe: Boolean) {
                     text = parseMarkdown(decryptedMessage),
                     fontSize = 16.sp,
                     lineHeight = 22.sp,
-                    color = Color(0xB3000000)
+                    color = if (isDark) Color.White else Color(0xB3000000)
                 )
             }
         }

@@ -16,6 +16,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -67,6 +68,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.zIndex
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -262,6 +264,7 @@ fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: () -> Unit) {
+    val isDark = isSystemInDarkTheme()
     val usersList = remember { mutableStateListOf<SnapUser>() }
     val storiesList = remember { mutableStateListOf<Story>() }
     var selectedStoryForSheet by remember { mutableStateOf<Story?>(null) }
@@ -481,12 +484,16 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize().blur(androidx.compose.ui.unit.lerp(0.dp, 25.dp, blurProgress)),
-            containerColor = Color.White,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
                     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
                         Box(
-                            modifier = Modifier.size(44.dp).align(Alignment.CenterStart).clip(CircleShape).background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
+                            modifier = Modifier
+                                .size(44.dp)
+                                .align(Alignment.CenterStart)
+                                .clip(CircleShape)
+                                .background(if (isDark) Color.White else Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
                                 .clickable { context.startActivity(Intent(context, WelcomeActivity::class.java)) },
                             contentAlignment = Alignment.Center
                         ) {
@@ -526,7 +533,10 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                     AsyncImage(
                                         model = profileRequest,
                                         contentDescription = "Profile",
-                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(if (isDark) 2.5.dp else 0.dp) // Ring effect
+                                            .clip(CircleShape),
                                         contentScale = ContentScale.Crop,
                                         error = painterResource(R.drawable.logo)
                                     )
@@ -538,19 +548,25 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                             modifier = Modifier.align(Alignment.Center)
                                 .clickable { context.startActivity(Intent(context, Setting::class.java)) }
                         ) {
-                            Image(painter = painterResource(id = R.drawable.logo), contentDescription = "Logo", modifier = Modifier.height(30.dp), contentScale = ContentScale.Fit)
+                            Image(
+                                painter = painterResource(id = R.drawable.logo),
+                                contentDescription = "Logo",
+                                modifier = Modifier.height(30.dp),
+                                contentScale = ContentScale.Fit,
+                                colorFilter = ColorFilter.tint(if (isDark) Color.White else MaterialTheme.colorScheme.onSurface)
+                            )
                         }
 
                         Row(modifier = Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = { context.startActivity(Intent(context, Setting::class.java)) },
-                                modifier = Modifier.size(35.dp).clip(CircleShape).background(Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
+                                modifier = Modifier.size(35.dp).clip(CircleShape).background(if (isDark) Color.White else Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.setting_4),
                                     contentDescription = "Settings",
                                     modifier = Modifier.size(20.dp),
-                                    tint = Color.Unspecified
+                                    tint = Color.Black
                                 )
                             }
                         }
@@ -567,8 +583,8 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                 .padding(horizontal = 14.dp, vertical = 8.dp)
                                 .height(54.dp)
                                 .clip(RoundedCornerShape(60.dp))
-                                .background(Color.White.copy(alpha = 0.5f))
-                                .border(2.dp, Color(0xFFC8E6C9), RoundedCornerShape(60.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(60.dp))
                                 .padding(horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -576,7 +592,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                 modifier = Modifier
                                     .size(30.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White.copy(0.35f))
+                                    .background(if (isDark) Color.Black else Color.White.copy(0.35f))
                                     .clickable { isSearchVisible = false },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -584,7 +600,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                     painter = painterResource(id = R.drawable.search),
                                     contentDescription = null,
                                     modifier = Modifier.size(22.dp),
-                                    tint = Color.Gray
+                                    tint = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
                             }
 
@@ -604,7 +620,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                     placeholder = {
                                         Text(
                                             "Search friends...",
-                                            color = Color.Black.copy(0.4f),
+                                            color = MaterialTheme.colorScheme.onSurface.copy(0.4f),
                                             style = MaterialTheme.typography.bodyLarge
                                         )
                                     },
@@ -614,10 +630,10 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                         disabledContainerColor = Color.Transparent,
                                         focusedIndicatorColor = Color.Transparent,
                                         unfocusedIndicatorColor = Color.Transparent,
-                                        cursorColor = Color.Black
+                                        cursorColor = MaterialTheme.colorScheme.onSurface
                                     ),
                                     singleLine = true,
-                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp)
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                                 )
                             }
                         }
@@ -679,7 +695,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                                     text = story.userName.split(" ").firstOrNull() ?: "",
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Medium,
-                                                    color = Color.Black.copy(alpha = 0.7f)
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                                 )
                                             }
                                         }
@@ -687,7 +703,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                     HorizontalDivider(
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                                         thickness = 0.5.dp,
-                                        color = Color.Black.copy(alpha = 0.08f)
+                                        color = if (isDark) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                                     )
                                 }
                             }
@@ -705,7 +721,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                         })
                     }
                 }
-                Box(modifier = Modifier.fillMaxWidth().height(250.dp).align(Alignment.BottomCenter).background(brush = Brush.verticalGradient(colors = listOf(Color.Transparent, Color(0xFFFFFFFF).copy(alpha = 5000f)))))
+                Box(modifier = Modifier.fillMaxWidth().height(250.dp).align(Alignment.BottomCenter).background(brush = Brush.verticalGradient(colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.9f)))))
             }
         }
 
@@ -918,14 +934,15 @@ fun StoryBottomSheet(
 
 @Composable
 fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
+    val isDark = isSystemInDarkTheme()
     Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).drawBehind {
         val strokeWidth = 0.5.dp.toPx()
         val y = size.height - strokeWidth / 2
-        drawLine(color = Color(0xFFEEEEEE), start = Offset(72.dp.toPx(), y), end = Offset(size.width, y), strokeWidth = strokeWidth)
+        drawLine(color = if (isDark) Color.White.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.1f), start = Offset(72.dp.toPx(), y), end = Offset(size.width, y), strokeWidth = strokeWidth)
     }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(54.dp).border(width = 2.dp, color = if (user.status == "Online") Color(
+        Box(modifier = Modifier.size(54.dp).border(width = 2.dp, color = if (isDark) Color.White else (if (user.status == "Online") Color(
             0xFFA5D6A7
-        ) else Color(0xFFFFF59D).copy(alpha = 5f), shape = CircleShape).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+        ) else Color(0xFFFFF59D).copy(alpha = 0.5f)), shape = CircleShape).background(MaterialTheme.colorScheme.surface, CircleShape), contentAlignment = Alignment.Center) {
             val context = LocalContext.current
             val imageRequest = remember(user.imageName) {
                 val data: Any = if (user.imageName.startsWith("data:image")) {
@@ -959,11 +976,11 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = user.name, fontSize = 17.sp, fontWeight = FontWeight.Normal)
+            Text(text = user.name, fontSize = 17.sp, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val statusText = if (user.lastMessage.isNotEmpty()) user.lastMessage else if (user.status == "Online") "Online" else formatLastSeen(user.lastSeen)
-                Text(text = "➤ ", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(end = 4.dp))
-                Text(text = statusText, color = Color.Gray, fontSize = 13.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text(text = "➤ ", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), fontSize = 11.sp, modifier = Modifier.padding(end = 4.dp))
+                Text(text = statusText, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), fontSize = 13.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
         }
     }
@@ -978,11 +995,15 @@ fun FloatingBottomNavBar(
     onStoryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.zIndex(1f).padding(horizontal = 80.dp).height(50.dp).clip(RoundedCornerShape(30.dp)).background(Color(0xFFFFF2D9)).border(width = 2.dp, color = Color.White.copy(alpha = 0.8f), shape = RoundedCornerShape(30.dp))) {
+    val isDark = isSystemInDarkTheme()
+    val bgColor = if (isDark) Color(0xFF1A1A1A) else Color(0xFFFFF2D9)
+    val iconColor = if (isDark) Color.White else Color.Black
+
+    Box(modifier = modifier.zIndex(1f).padding(horizontal = 80.dp).height(50.dp).clip(RoundedCornerShape(30.dp)).background(bgColor).border(width = 2.dp, color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(30.dp))) {
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onCameraClick, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.camera), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+            IconButton(onClick = onCameraClick, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.camera), null, tint = iconColor, modifier = Modifier.size(20.dp)) }
             Spacer(modifier = Modifier.width(20.dp))
-            IconButton(onClick = onSearchClick, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.search), null, tint = Color.Black, modifier = Modifier.size(20.dp)) }
+            IconButton(onClick = onSearchClick, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.search), null, tint = iconColor, modifier = Modifier.size(20.dp)) }
             Spacer(modifier = Modifier.width(20.dp))
             Box(
                 modifier = Modifier
@@ -994,7 +1015,7 @@ fun FloatingBottomNavBar(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(painterResource(R.drawable.heart), null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                Icon(painterResource(R.drawable.heart), null, tint = iconColor, modifier = Modifier.size(20.dp))
             }
         }
     }
