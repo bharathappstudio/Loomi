@@ -2,7 +2,6 @@ package com.echo.loomi
 
 import android.content.Context
 import android.content.Intent
-import androidx.core.content.ContextCompat
 import androidx.work.*
 import java.util.concurrent.TimeUnit
 
@@ -10,7 +9,7 @@ class KeepAliveWorker(context: Context, params: WorkerParameters) : Worker(conte
     override fun doWork(): Result {
         val serviceIntent = Intent(applicationContext, MessageListenerService::class.java)
         try {
-            ContextCompat.startForegroundService(applicationContext, serviceIntent)
+            applicationContext.startService(serviceIntent)
         } catch (e: Exception) {
             // Might fail in background
         }

@@ -47,7 +47,7 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Notifications for incoming calls"
-                setSound(null, null) // Handled by activity or custom sound
+                setSound(null, null) 
                 enableVibration(true)
             }
             manager.createNotificationChannel(callChannel)

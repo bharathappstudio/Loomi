@@ -220,7 +220,8 @@ fun MessageScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Background
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+        val bgColor = if (isDark) MaterialTheme.colorScheme.background else Color(0xFFFFFBF6)
+        Box(modifier = Modifier.fillMaxSize().background(bgColor))
 
         Column(modifier = Modifier
             .fillMaxSize()
@@ -326,9 +327,10 @@ fun MessageTopBar(
     onCallClick: () -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
+    val topBarColor = if (isDark) MaterialTheme.colorScheme.surface else Color(0xFFFFFBF6)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
+        color = topBarColor,
     ) {
         Column {
             Row(
@@ -466,7 +468,7 @@ fun FloatingBottomNavBar(
             .background(bgColor)
             .border(
                 width = 2.dp,
-                color = Color(0xFFFFFFFF).copy(alpha = if (isExpanded) 0.3f else 0.8f),
+                color = Color(0xFFFFF2D9).copy(alpha = if (isExpanded) 0.3f else 0.8f),
                 shape = RoundedCornerShape(30.dp)
             )
     ) {

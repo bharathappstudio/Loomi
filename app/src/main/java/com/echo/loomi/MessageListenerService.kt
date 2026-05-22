@@ -18,6 +18,13 @@ class MessageListenerService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         NotificationHelper.createNotificationChannel(this)
+        
+        val auth = FirebaseAuth.getInstance()
+        if (auth.currentUser == null) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         startListening()
         listenForCalls()
         return START_STICKY
@@ -105,6 +112,7 @@ class MessageListenerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        // Attempt to restart the service if the app is swiped away
         val restartServiceIntent = Intent(applicationContext, this.javaClass)
         restartServiceIntent.setPackage(packageName)
         startService(restartServiceIntent)

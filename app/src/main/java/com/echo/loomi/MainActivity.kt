@@ -166,6 +166,10 @@ class MainActivity : ComponentActivity() {
         val serviceIntent = Intent(this, MessageListenerService::class.java)
         startService(serviceIntent)
 
+        KeepAliveWorker.schedule(this)
+
+        checkBatteryOptimizations()
+
         if (!prefs.getBoolean("profile_done", false)) {
             val db = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
             db.child("users").child(auth.currentUser!!.uid).child("imageName").get()
@@ -183,6 +187,26 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                     finish()
                 }
+        }
+    }
+
+    private fun checkBatteryOptimizations() {
+        val packageName = packageName
+        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            try {
+                val intent = Intent().apply {
+                    action = android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                    data = android.net.Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback to battery settings if direct request fails
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    startActivity(intent)
+                } catch (ex: Exception) {}
+            }
         }
     }
 }
@@ -230,7 +254,6 @@ fun formatLastSeen(lastSeen: Long): String {
 fun SnapStyleScreen(onLogout: () -> Unit, onAddAccount: () -> Unit) {
     val pagerState = rememberPagerState(initialPage = 1) { 2 }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
     HorizontalPager(
         state = pagerState,
@@ -593,7 +616,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                 .height(54.dp)
                                 .clip(RoundedCornerShape(60.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(60.dp))
+                                .border(1.dp, if (isDark) Color.White else Color.Black, RoundedCornerShape(600.dp))
                                 .padding(horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
