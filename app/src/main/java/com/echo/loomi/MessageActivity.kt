@@ -350,16 +350,35 @@ fun MessageTopBar(
                 
                 Spacer(Modifier.width(4.dp))
                 
+                val receiverImageModel = remember(receiverImage) {
+                    if (receiverImage.startsWith("data:image")) {
+                        try {
+                            val base64Data = receiverImage.substringAfter("base64,")
+                            Base64.decode(base64Data, Base64.DEFAULT)
+                        } catch (e: Exception) {
+                            receiverImage
+                        }
+                    } else if (receiverImage.startsWith("http")) {
+                        receiverImage
+                    } else if (receiverImage.isNotEmpty()) {
+                        "file:///android_asset/$receiverImage"
+                    } else {
+                        R.drawable.logo
+                    }
+                }
+
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data("file:///android_asset/$receiverImage")
+                        .data(receiverImageModel)
+                        .crossfade(true)
                         .build(),
                     contentDescription = null,
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
                         .border(1.dp, Color.Black.copy(alpha = 0.05f), CircleShape),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(R.drawable.logo)
                 )
                 
                 Spacer(Modifier.width(12.dp))
@@ -386,7 +405,7 @@ fun MessageTopBar(
 
                     IconButton(onClick = { /* Video Call Action */ }) {
                         Icon(
-                            painter = painterResource(R.drawable.videocam),
+                            painter = painterResource(R.drawable.video),
                             contentDescription = "Video Call",
                             tint = Color.Black.copy(alpha = 0.7f),
                             modifier = Modifier.size(24.dp)

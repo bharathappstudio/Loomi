@@ -1,5 +1,6 @@
 package com.echo.loomi
 
+import android.util.Base64
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -60,16 +61,35 @@ fun CallBottomSheet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // User Image
+            val imageModel = remember(receiverImage) {
+                if (receiverImage.startsWith("data:image")) {
+                    try {
+                        val base64Data = receiverImage.substringAfter("base64,")
+                        Base64.decode(base64Data, Base64.DEFAULT)
+                    } catch (e: Exception) {
+                        receiverImage
+                    }
+                } else if (receiverImage.startsWith("http")) {
+                    receiverImage
+                } else if (receiverImage.isNotEmpty()) {
+                    "file:///android_asset/$receiverImage"
+                } else {
+                    R.drawable.logo
+                }
+            }
+
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data("file:///android_asset/$receiverImage")
+                    .data(imageModel)
+                    .crossfade(true)
                     .build(),
                 contentDescription = null,
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
                     .border(2.dp, Color.Black.copy(alpha = 0.1f), CircleShape),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                error = painterResource(R.drawable.logo)
             )
 
             Spacer(modifier = Modifier.height(20.dp))

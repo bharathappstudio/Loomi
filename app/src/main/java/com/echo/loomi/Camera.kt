@@ -305,8 +305,20 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                     .background(Color.Black)
             ) {
                 if (selectedPreviewUri != null) {
+                    val previewModel = remember(selectedPreviewUri) {
+                        if (selectedPreviewUri?.scheme == "data") {
+                            try {
+                                val base64Data = selectedPreviewUri.toString().substringAfter("base64,")
+                                Base64.decode(base64Data, Base64.DEFAULT)
+                            } catch (e: Exception) {
+                                selectedPreviewUri!!
+                            }
+                        } else {
+                            selectedPreviewUri!!
+                        }
+                    }
                     coil.compose.AsyncImage(
-                        model = selectedPreviewUri,
+                        model = previewModel,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -415,16 +427,38 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                         .background(Color.Gray.copy(alpha = 0.1f))
                         .clickable {
                             if (currentUserImageAsset.isNotEmpty()) {
-                                selectedPreviewUri = Uri.parse("file:///android_asset/$currentUserImageAsset")
+                                val path = if (currentUserImageAsset.startsWith("data:image") || currentUserImageAsset.startsWith("http")) {
+                                    currentUserImageAsset
+                                } else {
+                                    "file:///android_asset/$currentUserImageAsset"
+                                }
+                                selectedPreviewUri = Uri.parse(path)
                             }
                         },
                     contentAlignment = Alignment.Center
                 ) {
+                    val userProfileModel = remember(currentUserImageAsset) {
+                        if (currentUserImageAsset.startsWith("data:image")) {
+                            try {
+                                val base64Data = currentUserImageAsset.substringAfter("base64,")
+                                Base64.decode(base64Data, Base64.DEFAULT)
+                            } catch (e: Exception) {
+                                currentUserImageAsset
+                            }
+                        } else if (currentUserImageAsset.startsWith("http")) {
+                            currentUserImageAsset
+                        } else if (currentUserImageAsset.isNotEmpty()) {
+                            "file:///android_asset/$currentUserImageAsset"
+                        } else {
+                            R.drawable.logo
+                        }
+                    }
                     coil.compose.AsyncImage(
-                        model = "file:///android_asset/$currentUserImageAsset",
+                        model = userProfileModel,
                         contentDescription = "Profile",
                         modifier = Modifier.fillMaxSize().clip(CircleShape),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(R.drawable.logo)
                     )
                 }
 
@@ -757,6 +791,11 @@ private suspend fun uploadToStory(context: Context, uri: Uri, songId: Long?, son
                 context.assets.open(assetPath).use {
                     BitmapFactory.decodeStream(it)
                 }
+            } else if (uri.scheme == "data") {
+                // Handle data: URIs (Base64)
+                val base64Data = uri.toString().substringAfter("base64,")
+                val decodedString = Base64.decode(base64Data, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(decodedString, 0, decodedString.size)
             } else {
                 // Local file or content URI
                 context.contentResolver.openInputStream(uri)?.use {

@@ -339,8 +339,14 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     var colorIndex2 by remember { mutableIntStateOf(1) }
     var colorIndex3 by remember { mutableIntStateOf(2) }
 
+    LaunchedEffect(currentUserImage) {
+        if (currentUserImage.isNotEmpty()) {
+            isLoadingProfile = false
+        }
+    }
+
     LaunchedEffect(Unit) {
-        delay(2000)
+        delay(4000) // Fallback timeout
         isLoadingProfile = false
     }
 
@@ -496,10 +502,34 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                     )
                                 } else {
                                     val profileRequest = remember(currentUserImage) {
-                                        ImageRequest.Builder(context).data("file:///android_asset/$currentUserImage")
-                                            .crossfade(true).size(120, 120).build()
+                                        val data: Any = if (currentUserImage.startsWith("data:image")) {
+                                            try {
+                                                val base64Data = currentUserImage.substringAfter("base64,")
+                                                Base64.decode(base64Data, Base64.DEFAULT)
+                                            } catch (e: Exception) {
+                                                currentUserImage
+                                            }
+                                        } else if (currentUserImage.startsWith("http")) {
+                                            currentUserImage
+                                        } else if (currentUserImage.isNotEmpty()) {
+                                            "file:///android_asset/$currentUserImage"
+                                        } else {
+                                            R.drawable.logo // Default placeholder
+                                        }
+                                        
+                                        ImageRequest.Builder(context)
+                                            .data(data)
+                                            .crossfade(true)
+                                            .size(120, 120)
+                                            .build()
                                     }
-                                    AsyncImage(model = profileRequest, contentDescription = "Profile", modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop)
+                                    AsyncImage(
+                                        model = profileRequest,
+                                        contentDescription = "Profile",
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = ContentScale.Crop,
+                                        error = painterResource(R.drawable.logo)
+                                    )
                                 }
                             }
                         }
@@ -897,8 +927,35 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
             0xFFA5D6A7
         ) else Color(0xFFFFF59D).copy(alpha = 5f), shape = CircleShape).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
             val context = LocalContext.current
-            val imageRequest = remember(user.imageName) { ImageRequest.Builder(context).data("file:///android_asset/${user.imageName}").crossfade(true).size(150, 150).build() }
-            AsyncImage(model = imageRequest, contentDescription = null, modifier = Modifier.padding(4.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+            val imageRequest = remember(user.imageName) {
+                val data: Any = if (user.imageName.startsWith("data:image")) {
+                    try {
+                        val base64Data = user.imageName.substringAfter("base64,")
+                        Base64.decode(base64Data, Base64.DEFAULT)
+                    } catch (e: Exception) {
+                        user.imageName
+                    }
+                } else if (user.imageName.startsWith("http")) {
+                    user.imageName
+                } else if (user.imageName.isNotEmpty()) {
+                    "file:///android_asset/${user.imageName}"
+                } else {
+                    R.drawable.logo
+                }
+                
+                ImageRequest.Builder(context)
+                    .data(data)
+                    .crossfade(true)
+                    .size(150, 150)
+                    .build()
+            }
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = null,
+                modifier = Modifier.padding(4.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                error = painterResource(R.drawable.logo)
+            )
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -937,7 +994,7 @@ fun FloatingBottomNavBar(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(painterResource(R.drawable.call), null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                Icon(painterResource(R.drawable.heart), null, tint = Color.Black, modifier = Modifier.size(20.dp))
             }
         }
     }
