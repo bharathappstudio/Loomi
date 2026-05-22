@@ -70,9 +70,6 @@ class LoginActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
 
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
-
         googleAuthClient = GoogleAuthClient(this) { success ->
             if (success) {
                 checkProfileAndNavigate()
@@ -197,6 +194,18 @@ fun BlackLoginUI(
         animationSpec = tween(durationMillis = 600),
         label = "C2"
     )
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // --- Dynamic System Bars Support ---
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (context as androidx.activity.ComponentActivity).window
+            val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !isDark
+            insetsController.isAppearanceLightNavigationBars = !isDark
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(

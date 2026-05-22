@@ -55,21 +55,11 @@ class Setting : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
-        }
-
         enableEdgeToEdge()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
-
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         prefs = getSharedPreferences("echo_prefs", MODE_PRIVATE)
 
@@ -107,6 +97,17 @@ fun SettingUI(onLogout: () -> Unit) {
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+
+    // --- Dynamic System Bars Support ---
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (context as androidx.activity.ComponentActivity).window
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !isDark
+            insetsController.isAppearanceLightNavigationBars = !isDark
+        }
+    }
 
     val user = FirebaseAuth.getInstance().currentUser
     val name = user?.displayName ?: "Unknown User"
@@ -218,7 +219,7 @@ fun SettingUI(onLogout: () -> Unit) {
                                 modifier = Modifier.fillMaxSize().clip(CircleShape).background(if (isDark) Color.White.copy(0.1f) else Color(0xFFF9FBE7)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(name.first().toString(), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text(name.firstOrNull()?.toString() ?: "?", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     }
@@ -258,15 +259,15 @@ fun SettingUI(onLogout: () -> Unit) {
             Box(Modifier.size(26.dp).offset(160.dp, up2.dp + 50.dp).background(bubbleColor, CircleShape))
 
             Column(Modifier.fillMaxSize().padding(16.dp)) {
-                Text("Get the best of Echo 🫐", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("Get the best of Loomi 🫐", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(4.dp))
-                Text("Higher limits, cloud storage, in Realtime Database Echo built in Ai", fontSize = 13.sp, color = if (isDark) Color.White.copy(0.6f) else Color(0xCC4E4E4E))
+                Text("Higher limits, cloud storage, in Realtime Database Loomi built in E2E", fontSize = 13.sp, color = if (isDark) Color.White.copy(0.6f) else Color(0xCC4E4E4E))
             }
         }
 
         Spacer(Modifier.height(24.dp))
 
-        SettingRow("Echo App Realtime Database", true) { /* context.startActivity(Intent(context, DataBackupScreen::class.java)) */ }
+        SettingRow("Loomi Realtime Database", true) { /* context.startActivity(Intent(context, DataBackupScreen::class.java)) */ }
         SettingRow("Permissions") { /* context.startActivity(Intent(context, PermissionsActivity::class.java)) */ }
         SettingRow("APP-Release") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://gitlab.com/jarvisvbharath11/Loomi/-/blob/release-apk/app/release/app-release.apk?ref_type=heads"))) }
         SettingRow("Give feedback") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://cal.com/ui-studio13"))) }

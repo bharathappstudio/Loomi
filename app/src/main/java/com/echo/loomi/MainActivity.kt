@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.zIndex
+import androidx.core.view.WindowCompat
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.text.format.DateUtils
@@ -101,9 +102,6 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
-
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         setContent {
             LoomiTheme {
@@ -365,6 +363,17 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     val c1 by animateColorAsState(googleColors[colorIndex1], tween(600), label = "c1")
     val c2 by animateColorAsState(googleColors[colorIndex2], tween(600), label = "c2")
     val c3 by animateColorAsState(googleColors[colorIndex3], tween(600), label = "c3")
+
+    // --- Dynamic System Bars Support ---
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (context as androidx.activity.ComponentActivity).window
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !isDark
+            insetsController.isAppearanceLightNavigationBars = !isDark
+        }
+    }
 
     LaunchedEffect(Unit) {
         val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
@@ -677,7 +686,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                                         try {
                                                             val imageBytes = Base64.decode(story.image, Base64.DEFAULT)
                                                             BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                                                        } catch (e: Exception) {
+                                                        } catch (e: Throwable) {
                                                             null
                                                         }
                                                     }
@@ -736,7 +745,9 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                 isStoriesVisible = !isStoriesVisible 
                 if (isStoriesVisible) isSearchVisible = false
             },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 45.dp)
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 20.dp)
         )
 
         if (selectedStoryForSheet != null) {

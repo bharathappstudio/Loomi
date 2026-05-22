@@ -62,9 +62,6 @@ class WelcomeActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
 
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
-
         setContent {
             LoomiTheme {
                 WelcomeScreen(onFinish = {
@@ -124,6 +121,18 @@ fun WelcomeScreen(onFinish: () -> Unit) {
     val c1 by animateColorAsState(googleColors[colorIndex1], tween(600), label = "c1")
     val c2 by animateColorAsState(googleColors[colorIndex2], tween(600), label = "c2")
     val c3 by animateColorAsState(googleColors[colorIndex3], tween(600), label = "c3")
+
+    val isDark = isSystemInDarkTheme()
+    // --- Dynamic System Bars Support ---
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (context as androidx.activity.ComponentActivity).window
+            val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !isDark
+            insetsController.isAppearanceLightNavigationBars = !isDark
+        }
+    }
 
     Box(
         modifier = Modifier
