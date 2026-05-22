@@ -173,7 +173,15 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
     var selectedPreviewUri by remember { mutableStateOf<Uri?>(null) }
-    
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedPreviewUri = uri
+        }
+    }
+
     var showMusicSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     var selectedTrackId by remember { mutableStateOf<Long?>(null) }
@@ -181,6 +189,20 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
 
     val mediaPlayer = remember { MediaPlayer().apply { isLooping = true } }
     var currentPlayingUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(isActive) {
+        if (!isActive) {
+            try {
+                if (currentPlayingUrl != null) {
+                    mediaPlayer.stop()
+                    mediaPlayer.reset()
+                    currentPlayingUrl = null
+                }
+            } catch (e: Exception) {
+                Log.e("CameraView", "Error stopping music", e)
+            }
+        }
+    }
 
     var isUploading by remember { mutableStateOf(false) }
 
@@ -453,13 +475,13 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { Toast.makeText(context, "Gallery feature coming soon", Toast.LENGTH_SHORT).show() },
+                    onClick = { galleryLauncher.launch("image/*") },
                     modifier = Modifier.size(50.dp).background(Color.Gray.copy(alpha = 0.1f), CircleShape)
                 ) {
                     Icon(painterResource(R.drawable.image), contentDescription = "Gallery", tint = Color.Black, modifier = Modifier.size(20.dp))
                 }
 
-                // Capture button
+                // Capture/Upload button
                 Box(
                     modifier = Modifier
                         .size(85.dp)
@@ -468,13 +490,14 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                         .border(2.dp, Color(0xFFFFE082), CircleShape)
                         .padding(4.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFA5D6A7))
+                        .background(if (selectedPreviewUri != null) Color(0xFF81C995) else Color(0xFFA5D6A7))
                         .clickable(enabled = !isUploading) {
                             scope.launch {
                                 isUploading = true
                                 if (selectedPreviewUri != null) {
                                     uploadToStory(context, selectedPreviewUri!!, selectedTrackId, selectedTrackName) {
                                         isUploading = false
+                                        selectedPreviewUri = null // Reset after upload
                                     }
                                     onImageCaptured(selectedPreviewUri!!)
                                 } else {
@@ -504,6 +527,13 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                                     )
                                 },
                             color = Color.White
+                        )
+                    } else if (selectedPreviewUri != null) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.send),
+                            contentDescription = "Upload",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }

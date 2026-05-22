@@ -295,7 +295,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
 
     val animProgress by animateFloatAsState(
         targetValue = if (isSearchVisible) 1f else 0f,
-        animationSpec = tween(500, easing = LinearOutSlowInEasing),
+        animationSpec = tween(200, easing = LinearOutSlowInEasing),
         label = "search_anim"
     )
 
@@ -311,7 +311,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
 
     val blurProgress by animateFloatAsState(
         targetValue = if (selectedStoryForSheet != null || isTrulyOffline) 1f else 0f,
-        animationSpec = tween(500),
+        animationSpec = tween(200),
         label = "sheet_blur"
     )
 
@@ -627,15 +627,22 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                                         .clip(CircleShape)
                                                         .background(Color.Gray.copy(alpha = 0.1f))
                                                 ) {
-                                                    AsyncImage(
-                                                        model = ImageRequest.Builder(context)
-                                                            .data("file:///android_asset/${story.userProfileImage}")
-                                                            .crossfade(true)
-                                                            .build(),
-                                                        contentDescription = null,
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        contentScale = ContentScale.Crop
-                                                    )
+                                                    val storyBitmap = remember(story.image) {
+                                                        try {
+                                                            val imageBytes = Base64.decode(story.image, Base64.DEFAULT)
+                                                            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                                                        } catch (e: Exception) {
+                                                            null
+                                                        }
+                                                    }
+                                                    if (storyBitmap != null) {
+                                                        Image(
+                                                            bitmap = storyBitmap.asImageBitmap(),
+                                                            contentDescription = null,
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = ContentScale.Crop
+                                                        )
+                                                    }
                                                 }
                                                 Spacer(modifier = Modifier.height(4.dp))
                                                 Text(
