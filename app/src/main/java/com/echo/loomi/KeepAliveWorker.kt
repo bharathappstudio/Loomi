@@ -9,7 +9,7 @@ class KeepAliveWorker(context: Context, params: WorkerParameters) : Worker(conte
     override fun doWork(): Result {
         val serviceIntent = Intent(applicationContext, MessageListenerService::class.java)
         try {
-            applicationContext.startService(serviceIntent)
+            androidx.core.content.ContextCompat.startForegroundService(applicationContext, serviceIntent)
         } catch (e: Exception) {
             // Might fail in background
         }

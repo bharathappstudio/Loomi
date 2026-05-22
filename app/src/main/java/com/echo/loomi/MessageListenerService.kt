@@ -1,10 +1,13 @@
 package com.echo.loomi
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
@@ -17,16 +20,36 @@ class MessageListenerService : Service() {
     private var callsListener: ValueEventListener? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        NotificationHelper.createNotificationChannel(this)
-        
         val auth = FirebaseAuth.getInstance()
-        if (auth.currentUser == null) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
             stopSelf()
             return START_NOT_STICKY
         }
 
+        // --- REAL-TIME CONNECTIVITY LOGIC ---
+        val userStatusRef = database.child("users").child(uid).child("status")
+        val lastSeenRef = database.child("users").child(uid).child("lastSeen")
+        val connectedRef = database.child(".info/connected")
+
+        // Force set Online immediately on start
+        userStatusRef.setValue("Online")
+
+        connectedRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val connected = snapshot.getValue(Boolean::class.java) ?: false
+                if (connected) {
+                    userStatusRef.setValue("Online")
+                    userStatusRef.onDisconnect().setValue("Offline")
+                    lastSeenRef.onDisconnect().setValue(ServerValue.TIMESTAMP)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
         startListening()
         listenForCalls()
+        
         return START_STICKY
     }
 
@@ -112,19 +135,32 @@ class MessageListenerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Attempt to restart the service if the app is swiped away
-        val restartServiceIntent = Intent(applicationContext, this.javaClass)
-        restartServiceIntent.setPackage(packageName)
-        startService(restartServiceIntent)
+        // Advanced Root-Style Restart: Uses AlarmManager to force-restart service in 1 second
+        val restartServiceIntent = Intent(applicationContext, this.javaClass).also {
+            it.setPackage(packageName)
+        }
+        val restartServicePendingIntent: PendingIntent = PendingIntent.getService(
+            this, 1, restartServiceIntent, 
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarmService: AlarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmService.set(
+            AlarmManager.ELAPSED_REALTIME, 
+            SystemClock.elapsedRealtime() + 1000, 
+            restartServicePendingIntent
+        )
+
         super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
-        usersListener?.let { database.child("users").removeEventListener(it) }
-        callsListener?.let { 
-            val myUid = FirebaseAuth.getInstance().currentUser?.uid
-            if (myUid != null) database.child("calls").child(myUid).removeEventListener(it)
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid != null) {
+            // Remove listeners but DO NOT set status to Offline here
+            // This keeps the user "Always Online" while the service attempts to restart
+            database.child("calls").child(uid).removeEventListener(callsListener!!)
         }
+        usersListener?.let { database.child("users").removeEventListener(it) }
         listeners.forEach { (chatId, listener) ->
             database.child("chats").child(chatId).removeEventListener(listener)
         }

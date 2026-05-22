@@ -164,11 +164,9 @@ class MainActivity : ComponentActivity() {
         }
 
         val serviceIntent = Intent(this, MessageListenerService::class.java)
-        startService(serviceIntent)
+        androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent)
 
         KeepAliveWorker.schedule(this)
-
-        checkBatteryOptimizations()
 
         if (!prefs.getBoolean("profile_done", false)) {
             val db = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
@@ -411,19 +409,12 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
             override fun onCancelled(error: DatabaseError) {}
         })
 
-        val userStatusRef = database.child("users").child(uid).child("status")
-        val lastSeenRef = database.child("users").child(uid).child("lastSeen")
         val connectedRef = database.child(".info/connected")
 
         connectedRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val connected = snapshot.getValue(Boolean::class.java) ?: false
                 isOffline = !connected
-                if (connected) {
-                    userStatusRef.setValue("Online")
-                    userStatusRef.onDisconnect().setValue("Offline")
-                    lastSeenRef.onDisconnect().setValue(ServerValue.TIMESTAMP)
-                }
             }
             override fun onCancelled(error: DatabaseError) {}
         })

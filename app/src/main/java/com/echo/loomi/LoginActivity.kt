@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.appcompat.app.AlertDialog
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -113,7 +114,34 @@ class LoginActivity : ComponentActivity() {
             isLoading.value = true
             requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
-            startGoogleSignIn()
+            // Check for background reliability permissions before signing in
+            requestBackgroundPermissions {
+                startGoogleSignIn()
+            }
+        }
+    }
+
+    private fun requestBackgroundPermissions(onComplete: () -> Unit) {
+        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            AlertDialog.Builder(this)
+                .setTitle("Background Reliability")
+                .setMessage("To receive messages and calls instantly, please allow Loomi to run in the background. Select 'Allow' in the next screen.")
+                .setPositiveButton("Configure") { dialog, which ->
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = android.net.Uri.parse("package:$packageName")
+                        }
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        onComplete()
+                    }
+                }
+                .setNegativeButton("Skip") { dialog, which -> onComplete() }
+                .setCancelable(false)
+                .show()
+        } else {
+            onComplete()
         }
     }
 

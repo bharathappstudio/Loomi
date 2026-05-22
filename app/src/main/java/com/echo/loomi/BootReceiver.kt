@@ -10,9 +10,9 @@ class BootReceiver : BroadcastReceiver() {
             intent?.action == "android.intent.action.QUICKBOOT_POWERON") {
             val serviceIntent = Intent(context, MessageListenerService::class.java)
             try {
-                context.startService(serviceIntent)
+                androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent)
             } catch (e: Exception) {
-                // Ignore if service cannot be started
+                // Root boot protection
             }
         }
     }

