@@ -21,12 +21,15 @@ class DirectReplyReceiver : BroadcastReceiver() {
             val currentUid = auth.currentUser?.uid ?: return
             val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
             
+            // End-to-End Encryption
+            val encryptedMessage = EncryptionUtils.encrypt(replyText)
+            
             val msgId = database.child("chats").child(chatId).push().key ?: ""
             val message = ChatMessage(
                 id = msgId,
                 senderId = currentUid,
                 receiverId = receiverUid,
-                message = replyText,
+                message = encryptedMessage,
                 timestamp = System.currentTimeMillis()
             )
             

@@ -164,7 +164,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val serviceIntent = Intent(this, MessageListenerService::class.java)
-        androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent)
+        startService(serviceIntent)
 
         KeepAliveWorker.schedule(this)
 
@@ -1003,7 +1003,11 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = user.name, fontSize = 17.sp, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val statusText = if (user.lastMessage.isNotEmpty()) user.lastMessage else if (user.status == "Online") "Online" else formatLastSeen(user.lastSeen)
+                val displayMsg = remember(user.lastMessage) {
+                    if (user.lastMessage.startsWith("img:")) "Sent an image"
+                    else EncryptionUtils.decrypt(user.lastMessage)
+                }
+                val statusText = if (displayMsg.isNotEmpty()) displayMsg else if (user.status == "Online") "Online" else formatLastSeen(user.lastSeen)
                 Text(text = "➤ ", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), fontSize = 11.sp, modifier = Modifier.padding(end = 4.dp))
                 Text(text = statusText, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), fontSize = 13.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }

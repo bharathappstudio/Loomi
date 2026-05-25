@@ -37,9 +37,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
-import androidx.compose.ui.unit.lerp
-import androidx.compose.ui.unit.fontscaling.MathUtils.lerp
+import androidx.compose.ui.unit.lerp as lerpDp
+import androidx.compose.ui.util.lerp
 import androidx.core.view.WindowCompat
+import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.echo.loomi.ui.theme.LoomiTheme
@@ -117,6 +118,7 @@ fun MessageScreen(
     
     val chatId = if (currentUid < receiverUid) "${currentUid}_$receiverUid" else "${receiverUid}_$currentUid"
     val messagesList = remember { mutableStateListOf<ChatMessage>() }
+    var receiverStatus by remember { mutableStateOf("Offline") }
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -126,6 +128,15 @@ fun MessageScreen(
     var activeCallData by remember { mutableStateOf<CallData?>(null) }
 
     val context = LocalContext.current
+
+    LaunchedEffect(receiverUid) {
+        database.child("users").child(receiverUid).child("status").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                receiverStatus = snapshot.getValue(String::class.java) ?: "Offline"
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -450,8 +461,8 @@ fun FloatingBottomNavBar(
         label = "nav_morph"
     )
 
-    val horizontalPadding = androidx.compose.ui.unit.lerp(80.dp, 10.dp, animProgress)
-    val barHeight = androidx.compose.ui.unit.lerp(50.dp, 60.dp, animProgress)
+    val horizontalPadding = lerpDp(80.dp, 10.dp, animProgress)
+    val barHeight = lerpDp(50.dp, 60.dp, animProgress)
     val isDark = isSystemInDarkTheme()
     val bgColor = if (isDark) {
         androidx.compose.ui.graphics.lerp(Color(0xFF1A1A1A), Color(0xFF121212).copy(0.7f), animProgress)
@@ -468,7 +479,7 @@ fun FloatingBottomNavBar(
             .background(bgColor)
             .border(
                 width = 2.dp,
-                color = Color(0xFFFFF2D9).copy(alpha = if (isExpanded) 0.3f else 0.8f),
+                color = Color(0xFFFFF2D9).copy(alpha = if (isExpanded) 3f else 0.3f),
                 shape = RoundedCornerShape(30.dp)
             )
     ) {

@@ -27,25 +27,35 @@ class MessageListenerService : Service() {
             return START_NOT_STICKY
         }
 
-        // --- REAL-TIME CONNECTIVITY LOGIC ---
+        // --- ALWAYS ONLINE ROOT LOGIC ---
         val userStatusRef = database.child("users").child(uid).child("status")
-        val lastSeenRef = database.child("users").child(uid).child("lastSeen")
+        userStatusRef.keepSynced(true)
         val connectedRef = database.child(".info/connected")
 
-        // Force set Online immediately on start
-        userStatusRef.setValue("Online")
-
+        // Force set Online and keep it that way
         connectedRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val connected = snapshot.getValue(Boolean::class.java) ?: false
                 if (connected) {
                     userStatusRef.setValue("Online")
-                    userStatusRef.onDisconnect().setValue("Offline")
-                    lastSeenRef.onDisconnect().setValue(ServerValue.TIMESTAMP)
+                    // Removed onDisconnect().setValue("Offline") to stay "Always Online"
+                    // We only set Offline on explicit Logout in MainActivity
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
         })
+
+        // Heartbeat to force Online status every 4 minutes
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val heartbeat = object : Runnable {
+            override fun run() {
+                if (FirebaseAuth.getInstance().currentUser != null) {
+                    userStatusRef.setValue("Online")
+                    handler.postDelayed(this, 240000) // 4 minutes
+                }
+            }
+        }
+        handler.post(heartbeat)
 
         startListening()
         listenForCalls()
