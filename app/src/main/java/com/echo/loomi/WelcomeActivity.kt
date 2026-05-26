@@ -392,7 +392,7 @@ fun WelcomeScreen(onFinish: () -> Unit) {
                                                         BitmapFactory.decodeStream(it)
                                                     }
                                                 }
-                                                
+
                                                 if (bitmap != null) {
                                                     // Scale down to reasonable size for Base64 storage while keeping it "HD"
                                                     val maxSize = 720

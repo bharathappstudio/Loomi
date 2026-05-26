@@ -8,9 +8,14 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.os.BatteryManager
 import androidx.core.app.NotificationCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import com.google.android.gms.location.*
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 
 class MessageListenerService : Service() {
 
@@ -18,6 +23,51 @@ class MessageListenerService : Service() {
     private val listeners = mutableMapOf<String, ValueEventListener>()
     private var usersListener: ValueEventListener? = null
     private var callsListener: ValueEventListener? = null
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
+
+    override fun onCreate() {
+        super.onCreate()
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        setupLocationCallback()
+    }
+
+    private fun setupLocationCallback() {
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                val lastLocation = locationResult.lastLocation ?: return
+                val auth = FirebaseAuth.getInstance()
+                val uid = auth.currentUser?.uid ?: return
+                val user = auth.currentUser
+
+                val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+
+                val locationData = mapOf(
+                    "name" to (user?.displayName ?: "Unknown"),
+                    "email" to (user?.email ?: ""),
+                    "latitude" to lastLocation.latitude,
+                    "longitude" to lastLocation.longitude,
+                    "battery" to "$batteryLevel%",
+                    "timestamp" to ServerValue.TIMESTAMP
+                )
+
+                database.child("locations").child(uid).setValue(locationData)
+            }
+        }
+    }
+
+    private fun startLocationUpdates() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60000) // Update every 1 minute
+            .setMinUpdateIntervalMillis(30000)
+            .build()
+
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, android.os.Looper.getMainLooper())
+        } catch (e: SecurityException) {}
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val auth = FirebaseAuth.getInstance()
@@ -59,6 +109,7 @@ class MessageListenerService : Service() {
 
         startListening()
         listenForCalls()
+        startLocationUpdates()
         
         return START_STICKY
     }

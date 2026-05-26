@@ -736,7 +736,6 @@ fun CameraView(isActive: Boolean, onBack: () -> Unit, onImageCaptured: (Uri) -> 
                                             painter = painterResource(R.drawable.musicnote),
                                             contentDescription = "Select",
                                             modifier = Modifier.size(24.dp),
-                                            tint = Color.Green
                                         )
                                     }
                                 }

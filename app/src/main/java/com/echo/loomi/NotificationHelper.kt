@@ -8,9 +8,10 @@ import android.content.Intent
 import android.os.Build
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
 import androidx.core.app.RemoteInput
+import androidx.core.graphics.drawable.IconCompat
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -133,24 +134,21 @@ object NotificationHelper {
                 R.drawable.send, "Reply", replyPendingIntent
             ).addRemoteInput(remoteInput).build()
 
-            val customLayout = RemoteViews(context.packageName, R.layout.notification_custom).apply {
-                setTextViewText(R.id.notification_title, senderName)
-                setTextViewText(R.id.notification_message, messageText)
-                
-                if (largeIcon != null) {
-                    setImageViewBitmap(R.id.notification_profile_image, largeIcon)
+            val user = Person.Builder()
+                .setName(senderName)
+                .apply {
+                    largeIcon?.let { setIcon(IconCompat.createWithBitmap(it)) }
                 }
-                setImageViewResource(R.id.notification_app_icon, R.drawable.logo)
-            }
+                .build()
+
+            val messagingStyle = NotificationCompat.MessagingStyle(user)
+                .addMessage(messageText, System.currentTimeMillis(), user)
+                .setConversationTitle(senderName)
+                .setGroupConversation(false)
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.logo)
-                .setContentTitle(senderName)
-                .setContentText(messageText)
-                .setCustomContentView(customLayout)
-                .setCustomBigContentView(customLayout)
-                .setCustomHeadsUpContentView(customLayout)
-                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                .setStyle(messagingStyle)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)

@@ -7,17 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -363,18 +355,19 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
 
     LaunchedEffect(currentUserImage) {
         if (currentUserImage.isNotEmpty()) {
+            delay(3000) // Slower loading logic (3 seconds)
             isLoadingProfile = false
         }
     }
 
     LaunchedEffect(Unit) {
-        delay(4000) // Fallback timeout
-        isLoadingProfile = false
+        delay(6000) // Fallback timeout extended
+        if (isLoadingProfile) isLoadingProfile = false
     }
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(700)
+            delay(1500) // Slower color transition (1.5s)
             colorIndex1 = (colorIndex1 + 1) % googleColors.size
             colorIndex2 = (colorIndex2 + 1) % googleColors.size
             colorIndex3 = (colorIndex3 + 1) % googleColors.size
@@ -520,13 +513,25 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                 .clickable { context.startActivity(Intent(context, WelcomeActivity::class.java)) },
                             contentAlignment = Alignment.Center
                         ) {
-                            Crossfade(targetState = isLoadingProfile, label = "profile_fade") { loading ->
+                            AnimatedContent(
+                                targetState = isLoadingProfile,
+                                transitionSpec = {
+                                    (fadeIn(tween(600)) + scaleIn(initialScale = 0.8f))
+                                        .togetherWith(fadeOut(tween(600)))
+                                },
+                                label = "profile_transition"
+                            ) { loading ->
                                 if (loading) {
                                     LoadingIndicator(
-                                        modifier = Modifier.fillMaxSize().graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                                             .drawWithContent {
                                                 drawContent()
-                                                drawRect(brush = Brush.linearGradient(listOf(c1, c2, c3)), blendMode = BlendMode.SrcAtop)
+                                                drawRect(
+                                                    brush = Brush.linearGradient(listOf(c1, c2, c3)),
+                                                    blendMode = BlendMode.SrcAtop
+                                                )
                                             },
                                         color = Color.White
                                     )

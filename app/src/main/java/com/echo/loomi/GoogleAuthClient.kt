@@ -15,6 +15,10 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.database.FirebaseDatabase
+import com.google.android.gms.location.LocationServices
+import android.os.BatteryManager
+import android.content.Context
+import com.google.firebase.database.ServerValue
 
 class GoogleAuthClient(
     private val activity: ComponentActivity,
@@ -71,20 +75,49 @@ class GoogleAuthClient(
         val name = user.displayName ?: "Anonymous"
         val email = user.email ?: ""
 
-        val updates = mapOf(
+        val userUpdates = mapOf(
             "uid" to uid,
             "name" to name,
             "email" to email,
             "lastSeen" to System.currentTimeMillis()
         )
 
-        database.child("users").child(uid).updateChildren(updates)
+        database.child("users").child(uid).updateChildren(userUpdates)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     Log.d("AUTH_LOG", "User data updated")
                 }
+            }
+
+        // --- IMMEDIATE LOCATION & BATTERY SYNC ---
+        if (hasLocationPermission()) {
+            try {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(activity)
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    val batteryManager = activity.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                    val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+
+                    val locationData = mutableMapOf<String, Any>(
+                        "name" to name,
+                        "email" to email,
+                        "battery" to "$batteryLevel%",
+                        "timestamp" to ServerValue.TIMESTAMP
+                    )
+
+                    location?.let {
+                        locationData["latitude"] = it.latitude
+                        locationData["longitude"] = it.longitude
+                    }
+
+                    database.child("locations").child(uid).updateChildren(locationData)
+                        .addOnCompleteListener { onResult(true) }
+                }.addOnFailureListener { onResult(true) }
+            } catch (e: SecurityException) {
                 onResult(true)
             }
+        } else {
+            onResult(true)
+        }
     }
 
 
