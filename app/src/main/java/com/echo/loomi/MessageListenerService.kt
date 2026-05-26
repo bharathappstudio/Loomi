@@ -60,8 +60,8 @@ class MessageListenerService : Service() {
     private fun startLocationUpdates() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
 
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60000) // Update every 1 minute
-            .setMinUpdateIntervalMillis(30000)
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 300000) // Update every 5 minutes
+            .setMinUpdateIntervalMillis(150000) // At least 2.5 minutes between updates
             .build()
 
         try {

