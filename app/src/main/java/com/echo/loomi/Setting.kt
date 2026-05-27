@@ -273,7 +273,7 @@ fun SettingUI(onLogout: () -> Unit) {
         SettingRow("Give feedback") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://cal.com/ui-studio13"))) }
         SettingRow("Call to Developer") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("tel:+917094589909"))) }
         SettingRow("About") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/bharathappstudio"))) }
-        SettingRow("Updating Echo") { /* context.startActivity(Intent(context, EchoActivity::class.java)) */ }
+        SettingRow("Updating Echo") { context.startActivity(Intent(context, EchoActivity::class.java)) }
 
         Spacer(Modifier.height(24.dp))
 

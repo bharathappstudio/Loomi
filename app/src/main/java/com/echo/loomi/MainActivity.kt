@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.pulltorefresh.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.edit
@@ -280,7 +281,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     val storiesList = remember { mutableStateListOf<Story>() }
     var selectedStoryForSheet by remember { mutableStateOf<Story?>(null) }
     val songUrlCache = remember { mutableStateMapOf<Long, String>() }
-    
+
     var isSearchVisible by remember { mutableStateOf(false) }
     var isStoriesVisible by remember { mutableStateOf(false) }
     var isOffline by remember { mutableStateOf(false) }
@@ -290,6 +291,9 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
 
     val isKeyboardVisible = WindowInsets.isImeVisible
     var wasKeyboardOpened by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
 
     LaunchedEffect(isKeyboardVisible) {
         if (isKeyboardVisible) {
@@ -324,7 +328,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     }
 
     val blurProgress by animateFloatAsState(
-        targetValue = if (selectedStoryForSheet != null || isTrulyOffline) 1f else 0f,
+        targetValue = if (selectedStoryForSheet != null || isTrulyOffline || isRefreshing) 1f else 0f,
         animationSpec = tween(200),
         label = "sheet_blur"
     )
@@ -479,7 +483,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                         override fun onDataChange(userSnapshot: DataSnapshot) {
                             val userName = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
                             val userProfileImage = userSnapshot.child("imageName").getValue(String::class.java) ?: ""
-                            
+
                             val updatedStory = story.copy(userName = userName, userProfileImage = userProfileImage)
                             val index = storiesList.indexOfFirst { it.uid == story.uid }
                             if (index != -1) {
@@ -497,302 +501,424 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
         })
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize().blur(androidx.compose.ui.unit.lerp(0.dp, 25.dp, blurProgress)),
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = {
-                Column(modifier = Modifier.statusBarsPadding().fillMaxWidth().background(Color.Transparent)) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .align(Alignment.CenterStart)
-                                .clip(CircleShape)
-                                .background(if (isDark) Color.White else Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
-                                .clickable { context.startActivity(Intent(context, WelcomeActivity::class.java)) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AnimatedContent(
-                                targetState = isLoadingProfile,
-                                transitionSpec = {
-                                    (fadeIn(tween(600)) + scaleIn(initialScale = 0.8f))
-                                        .togetherWith(fadeOut(tween(600)))
-                                },
-                                label = "profile_transition"
-                            ) { loading ->
-                                if (loading) {
-                                    LoadingIndicator(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                                            .drawWithContent {
-                                                drawContent()
-                                                drawRect(
-                                                    brush = Brush.linearGradient(listOf(c1, c2, c3)),
-                                                    blendMode = BlendMode.SrcAtop
-                                                )
-                                            },
-                                        color = Color.White
-                                    )
-                                } else {
-                                    val profileRequest = remember(currentUserImage) {
-                                        val data: Any = if (currentUserImage.startsWith("data:image")) {
-                                            try {
-                                                val base64Data = currentUserImage.substringAfter("base64,")
-                                                Base64.decode(base64Data, Base64.DEFAULT)
-                                            } catch (e: Exception) {
-                                                currentUserImage
-                                            }
-                                        } else if (currentUserImage.startsWith("http")) {
-                                            currentUserImage
-                                        } else if (currentUserImage.isNotEmpty()) {
-                                            "file:///android_asset/$currentUserImage"
-                                        } else {
-                                            R.drawable.logo // Default placeholder
-                                        }
-                                        
-                                        ImageRequest.Builder(context)
-                                            .data(data)
-                                            .crossfade(true)
-                                            .size(120, 120)
-                                            .build()
-                                    }
-                                    AsyncImage(
-                                        model = profileRequest,
-                                        contentDescription = "Profile",
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(if (isDark) 2.5.dp else 0.dp) // Ring effect
-                                            .clip(CircleShape),
-                                        contentScale = ContentScale.Crop,
-                                        error = painterResource(R.drawable.logo)
-                                    )
-                                }
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier.align(Alignment.Center)
-                                .clickable { context.startActivity(Intent(context, Setting::class.java)) }
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.logo),
-                                contentDescription = "Logo",
-                                modifier = Modifier.height(30.dp),
-                                contentScale = ContentScale.Fit,
-                                colorFilter = ColorFilter.tint(if (isDark) Color.White else MaterialTheme.colorScheme.onSurface)
-                            )
-                        }
-
-                        Row(modifier = Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { context.startActivity(Intent(context, Setting::class.java)) },
-                                modifier = Modifier.size(35.dp).clip(CircleShape).background(if (isDark) Color.White else Color(0xFFFFECB3).copy(alpha = 0.5f), CircleShape)
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.setting_4),
-                                    contentDescription = "Settings",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = Color.Black
-                                )
-                            }
-                        }
-                    }
-
-                    AnimatedVisibility(
-                        visible = isSearchVisible,
-                        enter = fadeIn(animationSpec = tween(100)) + expandVertically(),
-                        exit = fadeOut(animationSpec = tween(100)) + shrinkVertically()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 8.dp)
-                                .height(54.dp)
-                                .clip(RoundedCornerShape(60.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .border(1.dp, if (isDark) Color.White else Color.Black, RoundedCornerShape(600.dp))
-                                .padding(horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isDark) Color.Black else Color.White.copy(0.35f))
-                                    .clickable { isSearchVisible = false },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.search),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(22.dp),
-                                    tint = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                            }
-
-                            AnimatedVisibility(
-                                visible = animProgress > 0.5f,
-                                enter = fadeIn(animationSpec = tween(400)) + expandHorizontally(),
-                                exit = fadeOut(animationSpec = tween(300)) + shrinkHorizontally(),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                LaunchedEffect(Unit) {
-                                    focusRequester.requestFocus()
-                                }
-                                TextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
-                                    modifier = Modifier.focusRequester(focusRequester),
-                                    placeholder = {
-                                        Text(
-                                            "Search friends...",
-                                            color = MaterialTheme.colorScheme.onSurface.copy(0.4f),
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                    },
-                                    colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        disabledContainerColor = Color.Transparent,
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent,
-                                        cursorColor = MaterialTheme.colorScheme.onSurface
-                                    ),
-                                    singleLine = true,
-                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                                )
-                            }
-                        }
-                    }
-                }
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            scope.launch {
+                delay(3000)
+                isRefreshing = false
             }
-        ) { padding ->
-            Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 120.dp)) {
-                    // Stories Row at the Top
-                    item {
-                        AnimatedVisibility(
-                            visible = isStoriesVisible,
-                            enter = fadeIn(animationSpec = tween(300)) + expandVertically(),
-                            exit = fadeOut(animationSpec = tween(300)) + shrinkVertically()
-                        ) {
-                            Column {
-                                if (storiesList.isNotEmpty()) {
-                                    LazyRow(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 12.dp),
-                                        contentPadding = PaddingValues(horizontal = 16.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        items(storiesList, key = { it.id }) { story ->
-                                            Column(
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                modifier = Modifier.clickable { selectedStoryForSheet = story }
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(68.dp)
-                                                        .clip(CircleShape)
-                                                        .border(2.dp, Color(0xFF81C995), CircleShape)
-                                                        .padding(3.dp)
-                                                        .clip(CircleShape)
-                                                        .background(Color.Gray.copy(alpha = 0.1f))
-                                                ) {
-                                                    val storyBitmap = remember(story.image) {
-                                                        try {
-                                                            val imageBytes = Base64.decode(story.image, Base64.DEFAULT)
-                                                            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                                                        } catch (e: Throwable) {
-                                                            null
-                                                        }
-                                                    }
-                                                    if (storyBitmap != null) {
-                                                        Image(
-                                                            bitmap = storyBitmap.asImageBitmap(),
-                                                            contentDescription = null,
-                                                            modifier = Modifier.fillMaxSize(),
-                                                            contentScale = ContentScale.Crop
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    text = story.userName.split(" ").firstOrNull() ?: "",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    HorizontalDivider(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                                        thickness = 0.5.dp,
-                                        color = if (isDark) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    items(items = filteredUsersList.value, key = { it.uid }) { user ->
-                        SnapChatItem(user, onClick = {
-                            val intent = Intent(context, MessageActivity::class.java).apply {
-                                putExtra("receiverUid", user.uid)
-                                putExtra("receiverName", user.name)
-                                putExtra("receiverImage", user.imageName)
-                            }
-                            context.startActivity(intent)
-                        })
-                    }
-                }
-                Box(modifier = Modifier.fillMaxWidth().height(250.dp).align(Alignment.BottomCenter).background(brush = Brush.verticalGradient(colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.9f)))))
-            }
-        }
-
-        FloatingBottomNavBar(
-            onCameraClick = onCameraClick,
-            onSearchClick = { 
-                isSearchVisible = !isSearchVisible 
-                if (isSearchVisible) isStoriesVisible = false
-            },
-            onAddAccount = onAddAccount,
-            onStoryClick = { 
-                isStoriesVisible = !isStoriesVisible 
-                if (isStoriesVisible) isSearchVisible = false
-            },
-            modifier = Modifier.align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = 20.dp)
-        )
-
-        if (selectedStoryForSheet != null) {
-            StoryBottomSheet(
-                story = selectedStoryForSheet!!,
-                cache = songUrlCache,
-                onDismiss = { selectedStoryForSheet = null }
-            )
-        }
-
-        if (isTrulyOffline) {
+        },
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Transparent)
-                    .clickable(enabled = true, onClick = {}), // Block all clicks
-                contentAlignment = Alignment.Center
+                    .blur(androidx.compose.ui.unit.lerp(0.dp, 25.dp, blurProgress))
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(
-                        painter = painterResource(id = R.drawable._404),
-                        contentDescription = "No Internet",
-                        modifier = Modifier.fillMaxWidth(0.7f),
-                        contentScale = ContentScale.Fit
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    topBar = {
+                        Column(
+                            modifier = Modifier
+                                .statusBarsPadding()
+                                .fillMaxWidth()
+                                .background(Color.Transparent)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .align(Alignment.CenterStart)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isDark) Color.White else Color(0xFFFFECB3).copy(
+                                                alpha = 0.5f
+                                            ), CircleShape
+                                        )
+                                        .clickable {
+                                            context.startActivity(
+                                                Intent(
+                                                    context,
+                                                    WelcomeActivity::class.java
+                                                )
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AnimatedContent(
+                                        targetState = isLoadingProfile,
+                                        transitionSpec = {
+                                            (fadeIn(tween(600)) + scaleIn(initialScale = 0.8f))
+                                                .togetherWith(fadeOut(tween(600)))
+                                        },
+                                        label = "profile_transition"
+                                    ) { loading ->
+                                        if (loading) {
+                                            LoadingIndicator(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                                                    .drawWithContent {
+                                                        drawContent()
+                                                        drawRect(
+                                                            brush = Brush.linearGradient(
+                                                                listOf(
+                                                                    c1,
+                                                                    c2,
+                                                                    c3
+                                                                )
+                                                            ),
+                                                            blendMode = BlendMode.SrcAtop
+                                                        )
+                                                    },
+                                                color = Color.White
+                                            )
+                                        } else {
+                                            val profileRequest = remember(currentUserImage) {
+                                                val data: Any =
+                                                    if (currentUserImage.startsWith("data:image")) {
+                                                        try {
+                                                            val base64Data =
+                                                                currentUserImage.substringAfter("base64,")
+                                                            Base64.decode(base64Data, Base64.DEFAULT)
+                                                        } catch (e: Exception) {
+                                                            currentUserImage
+                                                        }
+                                                    } else if (currentUserImage.startsWith("http")) {
+                                                        currentUserImage
+                                                    } else if (currentUserImage.isNotEmpty()) {
+                                                        "file:///android_asset/$currentUserImage"
+                                                    } else {
+                                                        R.drawable.logo // Default placeholder
+                                                    }
+
+                                                ImageRequest.Builder(context)
+                                                    .data(data)
+                                                    .crossfade(true)
+                                                    .size(120, 120)
+                                                    .build()
+                                            }
+                                            AsyncImage(
+                                                model = profileRequest,
+                                                contentDescription = "Profile",
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(if (isDark) 2.5.dp else 0.dp) // Ring effect
+                                                    .clip(CircleShape),
+                                                contentScale = ContentScale.Crop,
+                                                error = painterResource(R.drawable.logo)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier.align(Alignment.Center)
+                                        .clickable {
+                                            context.startActivity(
+                                                Intent(
+                                                    context,
+                                                    Setting::class.java
+                                                )
+                                            )
+                                        }
+                                ) {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.logo),
+                                        contentDescription = "Logo",
+                                        modifier = Modifier.height(30.dp),
+                                        contentScale = ContentScale.Fit,
+                                        colorFilter = ColorFilter.tint(if (isDark) Color.White else MaterialTheme.colorScheme.onSurface)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.align(Alignment.CenterEnd),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            context.startActivity(
+                                                Intent(
+                                                    context,
+                                                    Setting::class.java
+                                                )
+                                            )
+                                        },
+                                        modifier = Modifier.size(35.dp).clip(CircleShape).background(
+                                            if (isDark) Color.White else Color(0xFFFFECB3).copy(
+                                                alpha = 0.5f
+                                            ), CircleShape
+                                        )
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.setting_4),
+                                            contentDescription = "Settings",
+                                            modifier = Modifier.size(20.dp),
+                                            tint = Color.Black
+                                        )
+                                    }
+                                }
+                            }
+
+                            AnimatedVisibility(
+                                visible = isSearchVisible,
+                                enter = fadeIn(animationSpec = tween(100)) + expandVertically(),
+                                exit = fadeOut(animationSpec = tween(100)) + shrinkVertically()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                                        .height(54.dp)
+                                        .clip(RoundedCornerShape(60.dp))
+                                        .background(
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(
+                                                alpha = 0.5f
+                                            )
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isDark) Color.White else Color.Black,
+                                            RoundedCornerShape(600.dp)
+                                        )
+                                        .padding(horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isDark) Color.Black else Color.White.copy(0.35f))
+                                            .clickable { isSearchVisible = false },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.search),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(22.dp),
+                                            tint = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.6f
+                                            )
+                                        )
+                                    }
+
+                                    AnimatedVisibility(
+                                        visible = animProgress > 0.5f,
+                                        enter = fadeIn(animationSpec = tween(400)) + expandHorizontally(),
+                                        exit = fadeOut(animationSpec = tween(300)) + shrinkHorizontally(),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        LaunchedEffect(Unit) {
+                                            focusRequester.requestFocus()
+                                        }
+                                        TextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            modifier = Modifier.focusRequester(focusRequester),
+                                            placeholder = {
+                                                Text(
+                                                    "Search friends...",
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(
+                                                        0.4f
+                                                    ),
+                                                    style = MaterialTheme.typography.bodyLarge
+                                                )
+                                            },
+                                            colors = TextFieldDefaults.colors(
+                                                focusedContainerColor = Color.Transparent,
+                                                unfocusedContainerColor = Color.Transparent,
+                                                disabledContainerColor = Color.Transparent,
+                                                focusedIndicatorColor = Color.Transparent,
+                                                unfocusedIndicatorColor = Color.Transparent,
+                                                cursorColor = MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            singleLine = true,
+                                            textStyle = androidx.compose.ui.text.TextStyle(
+                                                fontSize = 16.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ) { padding ->
+                    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 120.dp)
+                        ) {
+                            // Stories Row at the Top
+                            item {
+                                AnimatedVisibility(
+                                    visible = isStoriesVisible,
+                                    enter = fadeIn(animationSpec = tween(300)) + expandVertically(),
+                                    exit = fadeOut(animationSpec = tween(300)) + shrinkVertically()
+                                ) {
+                                    Column {
+                                        if (storiesList.isNotEmpty()) {
+                                            LazyRow(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 12.dp),
+                                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                items(storiesList, key = { it.id }) { story ->
+                                                    Column(
+                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        modifier = Modifier.clickable {
+                                                            selectedStoryForSheet = story
+                                                        }
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(68.dp)
+                                                                .clip(CircleShape)
+                                                                .border(
+                                                                    2.dp,
+                                                                    Color(0xFF81C995),
+                                                                    CircleShape
+                                                                )
+                                                                .padding(3.dp)
+                                                                .clip(CircleShape)
+                                                                .background(
+                                                                    Color.Gray.copy(
+                                                                        alpha = 0.1f
+                                                                    )
+                                                                )
+                                                        ) {
+                                                            val storyBitmap =
+                                                                remember(story.image) {
+                                                                    try {
+                                                                        val imageBytes =
+                                                                            Base64.decode(
+                                                                                story.image,
+                                                                                Base64.DEFAULT
+                                                                            )
+                                                                        BitmapFactory.decodeByteArray(
+                                                                            imageBytes,
+                                                                            0,
+                                                                            imageBytes.size
+                                                                        )
+                                                                    } catch (e: Throwable) {
+                                                                        null
+                                                                    }
+                                                                }
+                                                            if (storyBitmap != null) {
+                                                                Image(
+                                                                    bitmap = storyBitmap.asImageBitmap(),
+                                                                    contentDescription = null,
+                                                                    modifier = Modifier.fillMaxSize(),
+                                                                    contentScale = ContentScale.Crop
+                                                                )
+                                                            }
+                                                        }
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        Text(
+                                                            text = story.userName.split(" ")
+                                                                .firstOrNull() ?: "",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(
+                                                                alpha = 0.7f
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            HorizontalDivider(
+                                                modifier = Modifier.fillMaxWidth()
+                                                    .padding(horizontal = 16.dp),
+                                                thickness = 0.5.dp,
+                                                color = if (isDark) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.onSurface.copy(
+                                                    alpha = 0.08f
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            items(items = filteredUsersList.value, key = { it.uid }) { user ->
+                                SnapChatItem(user, onClick = {
+                                    val intent =
+                                        Intent(context, MessageActivity::class.java).apply {
+                                            putExtra("receiverUid", user.uid)
+                                            putExtra("receiverName", user.name)
+                                            putExtra("receiverImage", user.imageName)
+                                        }
+                                    context.startActivity(intent)
+                                })
+                            }
+                        }
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(250.dp)
+                                .align(Alignment.BottomCenter).background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            MaterialTheme.colorScheme.background.copy(alpha = 0.9f)
+                                        )
+                                    )
+                                )
+                        )
+                    }
+                }
+
+                FloatingBottomNavBar(
+                    onCameraClick = onCameraClick,
+                    onSearchClick = {
+                        isSearchVisible = !isSearchVisible
+                        if (isSearchVisible) isStoriesVisible = false
+                    },
+                    onAddAccount = onAddAccount,
+                    onStoryClick = {
+                        isStoriesVisible = !isStoriesVisible
+                        if (isStoriesVisible) isSearchVisible = false
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 20.dp)
+                )
+            }
+
+            if (selectedStoryForSheet != null) {
+                StoryBottomSheet(
+                    story = selectedStoryForSheet!!,
+                    cache = songUrlCache,
+                    onDismiss = { selectedStoryForSheet = null }
+                )
+            }
+
+            if (isTrulyOffline) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Transparent)
+                        .clickable(enabled = true, onClick = {}), // Block all clicks
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Image(
+                            painter = painterResource(id = R.drawable._404),
+                            contentDescription = "No Internet",
+                            modifier = Modifier.fillMaxWidth(0.7f),
+                            contentScale = ContentScale.Fit
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
                 }
             }
         }
@@ -831,7 +957,7 @@ fun StoryBottomSheet(
         if (cache.containsKey(story.songId)) {
             previewUrl = cache[story.songId]
         }
-        
+
         withContext(Dispatchers.IO) {
             try {
                 val url = URL("https://itunes.apple.com/lookup?id=${story.songId}")
@@ -989,7 +1115,7 @@ fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
                 } else {
                     R.drawable.logo
                 }
-                
+
                 ImageRequest.Builder(context)
                     .data(data)
                     .crossfade(true)
