@@ -98,6 +98,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             LoomiTheme {
+                LaunchedEffect(Unit) {
+                    KeepAliveWorker.schedule(applicationContext)
+                    checkBatteryOptimizations()
+                }
                 SnapStyleScreen(
                     onLogout = {
                         val auth = FirebaseAuth.getInstance()

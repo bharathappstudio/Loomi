@@ -1,5 +1,6 @@
 package com.echo.loomi
 
+import android.content.Context
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -22,23 +23,67 @@ class LoomiFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
         
-        // Handle data messages even when app is closed
-        val data = message.data
-        if (data.isNotEmpty()) {
-            val senderName = data["senderName"] ?: "New Message"
-            val messageText = data["messageText"] ?: ""
-            val senderId = data["senderId"] ?: ""
-            val senderImage = data["senderImage"] ?: ""
-            val chatId = data["chatId"] ?: ""
+        Log.d("FCM", "Message received from: ${message.from}")
 
-            NotificationHelper.showMessageNotification(
-                applicationContext,
-                senderId,
-                senderName,
-                senderImage,
-                messageText,
-                chatId
-            )
+        // Ensure CPU is awake to process the message
+        val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val wakeLock = powerManager.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Loomi:FCMWakeLock")
+        wakeLock.acquire(5000)
+
+        try {
+            // Handle data messages even when app is closed
+            val data = message.data
+            if (data.isNotEmpty()) {
+                Log.d("FCM", "Data payload: $data")
+                val type = data["type"] ?: "message"
+                
+                if (type == "call") {
+                    val callerId = data["callerId"] ?: ""
+                    val callerName = data["callerName"] ?: "Unknown"
+                    val callerImage = data["callerImage"] ?: ""
+                    
+                    NotificationHelper.showCallNotification(
+                        applicationContext,
+                        callerId,
+                        callerName,
+                        callerImage
+                    )
+                } else {
+                    val senderName = data["senderName"] ?: data["title"] ?: "New Message"
+                    val messageText = data["messageText"] ?: data["body"] ?: ""
+                    val senderId = data["senderId"] ?: ""
+                    val senderImage = data["senderImage"] ?: ""
+                    val chatId = data["chatId"] ?: ""
+
+                    if (senderId.isNotEmpty()) {
+                        NotificationHelper.showMessageNotification(
+                            applicationContext,
+                            senderId,
+                            senderName,
+                            senderImage,
+                            messageText,
+                            chatId
+                        )
+                    }
+                }
+            } else {
+                // Fallback for notification-only payloads
+                message.notification?.let { notification ->
+                    Log.d("FCM", "Notification payload: ${notification.title}")
+                    NotificationHelper.showMessageNotification(
+                        applicationContext,
+                        "system",
+                        notification.title ?: "Loomi",
+                        "",
+                        notification.body ?: "",
+                        "system_chat"
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("FCM", "Error processing FCM message: ${e.message}")
+        } finally {
+            if (wakeLock.isHeld) wakeLock.release()
         }
     }
 }

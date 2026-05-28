@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -229,6 +230,12 @@ fun MessageScreen(
         }
     }
 
+    val blurProgress by animateFloatAsState(
+        targetValue = if (showCallSheet) 1f else 0f,
+        animationSpec = tween(300),
+        label = "call_blur"
+    )
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Background
         val bgColor = if (isDark) MaterialTheme.colorScheme.background else Color(0xFFFFFBF6)
@@ -238,6 +245,7 @@ fun MessageScreen(
             .fillMaxSize()
             .imePadding()
             .navigationBarsPadding()
+            .blur(lerpDp(0.dp, 25.dp, blurProgress))
         ) {
             MessageTopBar(
                 receiverName = receiverName,
@@ -279,6 +287,23 @@ fun MessageScreen(
                             timestamp = System.currentTimeMillis()
                         )
                         database.child("chats").child(chatId).child(msgId).setValue(message)
+                        
+                        // --- SEND FCM PUSH TRIGGER ---
+                        // Note: In a production app, this should be done via Firebase Cloud Functions
+                        // for security. Here we trigger it by updating a special 'notifications' node
+                        // that a backend/server can listen to.
+                        val notificationTrigger = mapOf(
+                            "type" to "message",
+                            "senderId" to currentUid,
+                            "senderName" to (auth.currentUser?.displayName ?: "Loomi User"),
+                            "senderImage" to (auth.currentUser?.photoUrl?.toString() ?: ""),
+                            "messageText" to input, // Real text for notification
+                            "receiverId" to receiverUid,
+                            "chatId" to chatId,
+                            "timestamp" to ServerValue.TIMESTAMP
+                        )
+                        database.child("notification_triggers").push().setValue(notificationTrigger)
+
                         input = ""
                     }
                 },

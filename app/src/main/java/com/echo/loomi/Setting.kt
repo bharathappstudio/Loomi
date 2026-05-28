@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -268,6 +269,14 @@ fun SettingUI(onLogout: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         SettingRow("Loomi Realtime Database", true) { /* context.startActivity(Intent(context, DataBackupScreen::class.java)) */ }
+        SettingRow("Battery Optimization") {
+            (context as? MainActivity)?.let { /* This won't work from Setting activity directly easily */ }
+            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            context.startActivity(intent)
+        }
+        SettingRow("Auto-Start Settings") {
+            BackgroundUtils.openAutoStartSettings(context)
+        }
         SettingRow("Permissions") { /* context.startActivity(Intent(context, PermissionsActivity::class.java)) */ }
         SettingRow("APP-Release") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://gitlab.com/jarvisvbharath11/Loomi/-/blob/release-apk/app/release/app-release.apk?ref_type=heads"))) }
         SettingRow("Give feedback") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://cal.com/ui-studio13"))) }

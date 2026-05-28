@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -24,6 +25,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 
 enum class CallState {
@@ -36,7 +38,10 @@ data class CallData(
     val callerName: String = "",
     val callerImage: String = "",
     val status: String = "ringing", // ringing, accepted, declined, ended
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val sdp: String? = null,
+    val type: String? = null, // offer, answer
+    val iceCandidates: Map<String, Map<String, Any>>? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,15 +56,23 @@ fun CallBottomSheet(
     onDismiss: () -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
+    val sheetState = rememberModalBottomSheetState(
+        confirmValueChange = { false } // Prevent dismissal by swipe
+    )
+
+    // Trigger FCM wakeup for the call (on receiver's side, logic should be in startCall)
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+        onDismissRequest = { /* Do nothing to prevent dismissal on outside tap */ },
+        sheetState = sheetState,
+        containerColor = Color.Transparent,
+        scrimColor = Color.Transparent,
+        dragHandle = null
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 40.dp, top = 20.dp),
+                .padding(bottom = 60.dp, top = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // User Image
@@ -187,7 +200,7 @@ fun startCall(receiverUid: String, receiverName: String, receiverImage: String) 
     val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
 
     // Encrypt metadata for privacy
-    val encryptedName = EncryptionUtils.encrypt("User") // Placeholder or actual name
+    val encryptedName = EncryptionUtils.encrypt(auth.currentUser?.displayName ?: "User")
     val encryptedImage = EncryptionUtils.encrypt(receiverImage)
 
     val callData = CallData(
@@ -199,6 +212,17 @@ fun startCall(receiverUid: String, receiverName: String, receiverImage: String) 
     )
 
     database.child("calls").child(receiverUid).setValue(callData)
+    
+    // --- SEND FCM CALL PUSH TRIGGER ---
+    val callTrigger = mapOf(
+        "type" to "call",
+        "callerId" to currentUid,
+        "callerName" to (auth.currentUser?.displayName ?: "Loomi User"),
+        "callerImage" to (auth.currentUser?.photoUrl?.toString() ?: ""),
+        "receiverId" to receiverUid,
+        "timestamp" to ServerValue.TIMESTAMP
+    )
+    database.child("notification_triggers").push().setValue(callTrigger)
 }
 
 fun endCall(receiverUid: String) {

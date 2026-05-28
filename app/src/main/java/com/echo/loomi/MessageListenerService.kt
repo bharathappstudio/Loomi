@@ -28,6 +28,7 @@ class MessageListenerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // Removed startForeground() call
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         setupLocationCallback()
     }
@@ -76,6 +77,9 @@ class MessageListenerService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+
+        // Removed startForeground() to stop showing the persistent notification
+        // We rely on FCM high-priority messages and WorkManager to keep the app responsive
 
         // --- ALWAYS ONLINE ROOT LOGIC ---
         val userStatusRef = database.child("users").child(uid).child("status")

@@ -5,16 +5,19 @@ import android.content.Intent
 import androidx.work.*
 import java.util.concurrent.TimeUnit
 
-class KeepAliveWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
-    override fun doWork(): Result {
+class KeepAliveWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
         val serviceIntent = Intent(applicationContext, MessageListenerService::class.java)
         try {
+            // Start as a normal service, not a foreground service, to avoid notifications
             applicationContext.startService(serviceIntent)
         } catch (e: Exception) {
-            // Might fail in background on newer Android versions
+            // Ignore
         }
         return Result.success()
     }
+
+    // Removed getForegroundInfo() to avoid showing a notification during work execution
 
     companion object {
         fun schedule(context: Context) {
@@ -28,7 +31,7 @@ class KeepAliveWorker(context: Context, params: WorkerParameters) : Worker(conte
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 "LoomiKeepAlive",
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 request
             )
         }
