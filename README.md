@@ -20,61 +20,7 @@
 </div>
 
 ---
-
-## ✨ Feature Showcase
-
-<table>
-<tr>
-<td width="50%">
-
-### 💬 &nbsp;Messaging
-- ⚡ Real-time chat via **Firebase Realtime DB**
-- 🔐 End-to-end **encrypted messages**
-- 📸 **Image sharing** via camera
-- 🔔 **Direct reply** from notification tray
-- ✍️ Animated **morphing input bar**
-- **`img:base64`** protocol for inline images
-
-</td>
-<td width="50%">
-
-### 📞 &nbsp;Calling
-- 🎙️ Live **audio calls** via WebRTC
-- 📡 **STUN server** NAT traversal (Google)
-- 🔔 Full-screen **incoming call** notification
-- 📱 **Proximity sensor** — screen off on ear
-- ⏱️ **Live call timer** overlay
-- 🔒 Encrypted caller identity in signaling
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 🎭 &nbsp;Stories
-- 🖼️ Snapchat-style **story circles**
-- 🎵 **iTunes API** music integration
-- 🎶 Auto-play **30s song preview**
-- 📅 Relative **time stamps** ("2m ago")
-- 🃏 **Bottom sheet** story viewer
-- 1️⃣ Most recent story per user only
-
-</td>
-<td width="50%">
-
-### 🏠 &nbsp;Home & Navigation
-- 👆 **Swipe-left** → Camera (HorizontalPager)
-- 🔍 **Animated search** bar with keyboard sync
-- 📶 **Offline banner** (5s grace period)
-- 🔄 **Pull-to-refresh** (3s animation)
-- 📌 Messages sorted by **last activity**
-- 🌙 Full **dark / light** theme support
-
-</td>
-</tr>
-</table>
-
----
+-
 
 ## 🛠️ Tech Stack
 
@@ -268,43 +214,6 @@ Caller                    Firebase (Signaling)              Callee
 
 ---
 
-## 🎭 UI / Compose Highlights
-
-```kotlin
-// 🌈 Animated gradient loading indicator
-LoadingIndicator(
-    modifier = Modifier
-        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-        .drawWithContent {
-            drawContent()
-            drawRect(
-                brush = Brush.linearGradient(listOf(c1, c2, c3)),
-                blendMode = BlendMode.SrcAtop
-            )
-        }
-)
-
-// 💫 Morphing bottom nav bar (icon mode ↔ input mode)
-val animProgress by animateFloatAsState(
-    targetValue = if (isExpanded) 1f else 0f,
-    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy)
-)
-val horizontalPadding = lerpDp(80.dp, 10.dp, animProgress)
-
-// 📖 Swipe-to-camera (Snapchat style)
-HorizontalPager(
-    state = pagerState,
-    beyondViewportPageCount = 1
-) { page ->
-    when (page) {
-        0 -> CameraScreen(...)
-        1 -> MainContent(...)
-    }
-}
-```
-
----
-
 ## 📦 Asset Structure
 
 ```
@@ -322,20 +231,6 @@ assets/
 
 ---
 
-## 🗺️ Roadmap
-
-- [ ] 🏗️ Migrate to **MVVM + Repository** pattern
-- [ ] 💉 Add **Hilt** dependency injection
-- [ ] 🔐 Upgrade to **ECDH + AES-GCM** E2E encryption
-- [ ] 📹 **Video calling** (CameraX + WebRTC video track)
-- [ ] 📎 **File sharing** (Firebase Storage)
-- [ ] 👥 **Group chats** (multi-user chat nodes)
-- [ ] 🟢 **Online indicators** with typing detection
-- [ ] 🧪 Add **unit tests** (ViewModel, Repository)
-- [ ] 🚀 Enable **ProGuard / R8** in release builds
-- [ ] ☁️ Move FCM triggers to **Firebase Cloud Functions**
-
----
 
 ## 🤝 Contributing
 
