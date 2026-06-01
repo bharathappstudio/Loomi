@@ -27,6 +27,8 @@ object NotificationHelper {
     private const val CALL_CHANNEL_NAME = "Loomi Calls"
     private const val SERVICE_CHANNEL_ID = "loomi_system_sync"
     private const val SERVICE_CHANNEL_NAME = "Sync Process"
+    private const val SECURITY_CHANNEL_ID = "loomi_security"
+    private const val SECURITY_CHANNEL_NAME = "Security Verification"
     const val KEY_TEXT_REPLY = "key_text_reply"
 
     fun createNotificationChannel(context: Context) {
@@ -69,7 +71,31 @@ object NotificationHelper {
                 enableLights(false)
             }
             manager.createNotificationChannel(serviceChannel)
+
+            // 4. Security Scan Channel
+            val securityChannel = NotificationChannel(
+                SECURITY_CHANNEL_ID,
+                SECURITY_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Privacy and Security verification"
+            }
+            manager.createNotificationChannel(securityChannel)
         }
+    }
+
+    fun showSecurityNotification(context: Context, body: String) {
+        val notification = NotificationCompat.Builder(context, SECURITY_CHANNEL_ID)
+            .setSmallIcon(R.drawable.logo)
+            .setContentTitle("") // Empty title
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .build()
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(2002, notification)
     }
 
     fun getServiceNotification(context: Context): android.app.Notification {

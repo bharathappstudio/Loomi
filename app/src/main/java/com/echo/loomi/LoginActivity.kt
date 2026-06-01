@@ -1,12 +1,12 @@
 package com.echo.loomi
 
+import androidx.appcompat.app.AppCompatActivity
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
@@ -45,7 +45,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.delay
 
-class LoginActivity : ComponentActivity() {
+class LoginActivity : AppCompatActivity() {
 
     private lateinit var googleAuthClient: GoogleAuthClient
     private var isLoading = mutableStateOf(false)
@@ -229,7 +229,7 @@ fun BlackLoginUI(
     val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (context as androidx.activity.ComponentActivity).window
+            val window = (context as AppCompatActivity).window
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = !isDark
             insetsController.isAppearanceLightNavigationBars = !isDark

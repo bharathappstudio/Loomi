@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import android.media.AudioAttributes
@@ -86,11 +87,18 @@ import java.util.concurrent.TimeUnit
 class MainActivity : ComponentActivity() {
 
     private lateinit var googleAuthClient: GoogleAuthClient
+    private lateinit var sosManager: SOSManager
+    private var showSOSOverlay = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        sosManager = SOSManager(this) {
+            showSOSOverlay.value = true
+        }
+        sosManager.start()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
@@ -98,31 +106,49 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             LoomiTheme {
-                LaunchedEffect(Unit) {
-                    KeepAliveWorker.schedule(applicationContext)
-                    checkBatteryOptimizations()
-                }
-                SnapStyleScreen(
-                    onLogout = {
-                        val auth = FirebaseAuth.getInstance()
-                        val uid = auth.currentUser?.uid
-                        if (uid != null) {
-                            val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
-                            database.child("users").child(uid).child("status").setValue("Offline")
-                            database.child("users").child(uid).child("lastSeen").setValue(ServerValue.TIMESTAMP)
-                        }
-                        googleAuthClient.signOut()
-                        getSharedPreferences("echo_prefs", MODE_PRIVATE).edit { clear() }
-
-                        val intent = Intent(this, LoginActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
-                    },
-                    onAddAccount = {
-                        googleAuthClient.signIn(forcePicker = true)
-                    }
+                val sosActive = showSOSOverlay.value
+                val blurValue by animateDpAsState(
+                    targetValue = if (sosActive) 30.dp else 0.dp,
+                    animationSpec = tween(500),
+                    label = "sos_blur"
                 )
+
+                Box(modifier = Modifier.fillMaxSize().blur(blurValue)) {
+                    LaunchedEffect(Unit) {
+                        KeepAliveWorker.schedule(applicationContext)
+                        checkBatteryOptimizations()
+                    }
+                    SnapStyleScreen(
+                        onLogout = {
+                            val auth = FirebaseAuth.getInstance()
+                            val uid = auth.currentUser?.uid
+                            if (uid != null) {
+                                val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+                                database.child("users").child(uid).child("status").setValue("Offline")
+                                database.child("users").child(uid).child("lastSeen").setValue(ServerValue.TIMESTAMP)
+                            }
+                            googleAuthClient.signOut()
+                            getSharedPreferences("echo_prefs", MODE_PRIVATE).edit { clear() }
+
+                            val intent = Intent(this@MainActivity, LoginActivity::class.java)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            startActivity(intent)
+                            finish()
+                        },
+                        onAddAccount = {
+                            googleAuthClient.signIn(forcePicker = true)
+                        }
+                    )
+                }
+
+                if (sosActive) {
+                    SOSOverlay(
+                        onTimeout = {
+                            sosManager.uploadSOSData()
+                            showSOSOverlay.value = false
+                        }
+                    )
+                }
             }
         }
 
@@ -164,6 +190,7 @@ class MainActivity : ComponentActivity() {
         startService(serviceIntent)
 
         KeepAliveWorker.schedule(this)
+        SecurityWorker.schedule(this)
 
         if (!prefs.getBoolean("profile_done", false)) {
             val db = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
@@ -202,6 +229,13 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                 } catch (ex: Exception) {}
             }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::sosManager.isInitialized) {
+            sosManager.stop()
         }
     }
 }

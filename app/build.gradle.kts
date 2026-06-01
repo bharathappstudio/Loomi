@@ -21,7 +21,7 @@ android {
     signingConfigs {
         create("release") {
             // Replace with your actual path and credentials
-            storeFile = file("/home/bharath/StudioProjects/loomi.jks")
+            storeFile = file("/home/bharath/AndroidStudioProjects/loomi.jks")
             storePassword = "jarvisbharath07"
             keyAlias = "key13"
             keyPassword = "jarvisbharath07"
@@ -31,11 +31,20 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Shrink the APK by only including the most common architectures
+            ndk {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            }
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
     compileOptions {

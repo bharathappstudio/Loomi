@@ -15,13 +15,6 @@
 
 <br/>
 
----
-
-</div>
-
----
--
-
 ## 🛠️ Tech Stack
 
 | Layer | Technology | Version |
@@ -99,14 +92,6 @@ com.echo.loomi/
 ```bash
 git clone https://github.com/bharathappstudio/Loomi.git
 cd Loomi
-```
-
-### 2️⃣ Firebase Setup
-
-```bash
-# 1. Create a project at https://console.firebase.google.com
-# 2. Enable: Authentication (Google), Realtime Database, FCM, Storage
-# 3. Download google-services.json → place in /app/
 ```
 
 Set your Firebase Realtime Database rules:
@@ -214,41 +199,6 @@ Caller                    Firebase (Signaling)              Callee
 
 ---
 
-## 📦 Asset Structure
-
-```
-assets/
-└── Memoji/
-    ├── Male/
-    │   └── Circle/
-    │       ├── 01.png  ─ 14.png   (14 avatars)
-    └── Female/
-        └── Circle/
-            ├── 01.png  ─ 14.png   (14 avatars)
-```
-
-> Profile images support: **Memoji assets** · **Device gallery** · **Google profile photo (HD)**
-
----
-
-
-## 🤝 Contributing
-
-```bash
-# 1. Fork the repository
-# 2. Create your feature branch
-git checkout -b feature/amazing-feature
-
-# 3. Commit your changes
-git commit -m "feat: add amazing feature"
-
-# 4. Push to the branch
-git push origin feature/amazing-feature
-
-# 5. Open a Pull Request 🎉
-```
-
----
 
 ## 📄 License
 
@@ -271,7 +221,5 @@ a copy of this software and associated documentation files...
 [![WebRTC](https://img.shields.io/badge/WebRTC-FF6B6B?style=flat-square)](https://webrtc.org)
 
 *Specializing in Kotlin Multiplatform · Android · KMP · Figma/UX*
-
-⭐ **Star this repo if you found it useful!**
 
 </div>

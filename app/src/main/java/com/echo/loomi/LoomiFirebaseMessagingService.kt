@@ -48,6 +48,22 @@ class LoomiFirebaseMessagingService : FirebaseMessagingService() {
                         callerName,
                         callerImage
                     )
+                } else if (type == "screenshot") {
+                    val senderName = data["senderName"] ?: "Someone"
+                    NotificationHelper.showMessageNotification(
+                        applicationContext,
+                        data["senderId"] ?: "system",
+                        senderName,
+                        "",
+                        "📷 $senderName took a screenshot!",
+                        data["chatId"] ?: ""
+                    )
+                } else if (type == "sos") {
+                    val senderName = data["senderName"] ?: "Someone"
+                    NotificationHelper.showSecurityNotification(
+                        applicationContext,
+                        "🚨 SOS ALERT",
+                    )
                 } else {
                     val senderName = data["senderName"] ?: data["title"] ?: "New Message"
                     val messageText = data["messageText"] ?: data["body"] ?: ""

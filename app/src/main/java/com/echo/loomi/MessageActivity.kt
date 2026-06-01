@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.*
 import androidx.compose.ui.unit.lerp as lerpDp
 import androidx.compose.ui.util.lerp
 import androidx.core.view.WindowCompat
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -50,10 +51,75 @@ import com.google.firebase.database.*
 import kotlinx.coroutines.delay
 import androidx.compose.material3.ExperimentalMaterial3Api
 import android.content.Intent
+import android.app.Activity
+import android.util.Log
+import android.widget.Toast
 
 class MessageActivity : ComponentActivity() {
+    private lateinit var sosManager: SOSManager
+    private var showSOSOverlay = mutableStateOf(false)
+
+    private val screenCaptureCallback = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        Activity.ScreenCaptureCallback {
+            notifyScreenshot()
+        }
+    } else {
+        null
+    }
+
+    private fun notifyScreenshot() {
+        val receiverUid = intent.getStringExtra("receiverUid") ?: ""
+        val auth = FirebaseAuth.getInstance()
+        val currentUid = auth.currentUser?.uid ?: return
+        val database = FirebaseDatabase.getInstance("https://echo-loomi-app-default-rtdb.firebaseio.com/").reference
+        
+        val chatId = if (currentUid < receiverUid) "${currentUid}_$receiverUid" else "${receiverUid}_$currentUid"
+        val msgId = database.child("chats").child(chatId).push().key ?: ""
+        
+        val notificationTrigger = mapOf(
+            "type" to "screenshot",
+            "senderId" to currentUid,
+            "senderName" to (auth.currentUser?.displayName ?: "Loomi User"),
+            "receiverId" to receiverUid,
+            "chatId" to chatId,
+            "timestamp" to ServerValue.TIMESTAMP
+        )
+        database.child("notification_triggers").push().setValue(notificationTrigger)
+        
+        val systemMsg = ChatMessage(
+            id = msgId,
+            senderId = "system",
+            receiverId = receiverUid,
+            message = "📷 You took a screenshot",
+            timestamp = System.currentTimeMillis()
+        )
+        database.child("chats").child(chatId).child(msgId).setValue(systemMsg)
+        
+        Toast.makeText(this, "Notification sent to friend", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        sosManager.start()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            screenCaptureCallback?.let { registerScreenCaptureCallback(mainExecutor, it) }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        sosManager.stop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            screenCaptureCallback?.let { unregisterScreenCaptureCallback(it) }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        sosManager = SOSManager(this) {
+            showSOSOverlay.value = true
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setFlags(
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
@@ -79,12 +145,30 @@ class MessageActivity : ComponentActivity() {
 
         setContent {
             LoomiTheme {
-                MessageScreen(
-                    receiverUid = receiverUid,
-                    receiverName = receiverName,
-                    receiverImage = receiverImage,
-                    onBack = { finish() }
+                val sosActive = showSOSOverlay.value
+                val blurValue by animateDpAsState(
+                    targetValue = if (sosActive) 30.dp else 0.dp,
+                    animationSpec = tween(500),
+                    label = "sos_blur"
                 )
+
+                Box(modifier = Modifier.fillMaxSize().blur(blurValue)) {
+                    MessageScreen(
+                        receiverUid = receiverUid,
+                        receiverName = receiverName,
+                        receiverImage = receiverImage,
+                        onBack = { finish() }
+                    )
+                }
+                
+                if (sosActive) {
+                    SOSOverlay(
+                        onTimeout = {
+                            sosManager.uploadSOSData()
+                            showSOSOverlay.value = false
+                        }
+                    )
+                }
             }
         }
     }
