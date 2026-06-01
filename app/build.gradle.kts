@@ -31,20 +31,11 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Shrink the APK by only including the most common architectures
-            ndk {
-                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-            }
-        }
-        debug {
-            isMinifyEnabled = false
-            isShrinkResources = false
         }
     }
     compileOptions {
