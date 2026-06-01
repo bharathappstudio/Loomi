@@ -21,7 +21,7 @@ android {
     signingConfigs {
         create("release") {
             // Replace with your actual path and credentials
-            storeFile = file("/home/bharath/AndroidStudioProjects/loomi.jks")
+            storeFile = file("/home/bharath/StudioProjects/Loomi.jks")
             storePassword = "jarvisbharath07"
             keyAlias = "key13"
             keyPassword = "jarvisbharath07"
