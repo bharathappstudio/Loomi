@@ -98,6 +98,41 @@ object NotificationHelper {
         manager.notify(2002, notification)
     }
 
+    fun showSOSNotification(
+        context: Context,
+        senderName: String,
+        battery: String,
+        lat: Double,
+        lon: Double
+    ) {
+        val notificationId = 3003
+        val body = "🚨 $senderName needs help! Battery: $battery"
+        
+        val mapIntent = Intent(Intent.ACTION_VIEW).apply {
+            data = android.net.Uri.parse("google.navigation:q=$lat,$lon")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        
+        val pendingIntent = PendingIntent.getActivity(
+            context, notificationId, mapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, SECURITY_CHANNEL_ID)
+            .setSmallIcon(R.drawable.sos)
+            .setContentTitle("🚨 SOS ALERT")
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(notificationId, notification)
+    }
+
     fun getServiceNotification(context: Context): android.app.Notification {
         val builder = NotificationCompat.Builder(context, SERVICE_CHANNEL_ID)
             .setSmallIcon(R.drawable.logo)

@@ -269,20 +269,12 @@ fun SettingUI(onLogout: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         SettingRow("Loomi Realtime Database", true) { /* context.startActivity(Intent(context, DataBackupScreen::class.java)) */ }
-        SettingRow("Battery Optimization") {
-            (context as? MainActivity)?.let { /* This won't work from Setting activity directly easily */ }
-            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-            context.startActivity(intent)
-        }
-        SettingRow("Auto-Start Settings") {
-            BackgroundUtils.openAutoStartSettings(context)
-        }
         SettingRow("Permissions") { /* context.startActivity(Intent(context, PermissionsActivity::class.java)) */ }
         SettingRow("APP-Release") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://gitlab.com/jarvisvbharath11/Loomi/-/blob/release-apk/app/release/app-release.apk?ref_type=heads"))) }
         SettingRow("Give feedback") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://cal.com/ui-studio13"))) }
         SettingRow("Call to Developer") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("tel:+917094589909"))) }
         SettingRow("About") { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/bharathappstudio"))) }
-        SettingRow("Updating Echo") { context.startActivity(Intent(context, EchoActivity::class.java)) }
+        SettingRow("Updating LOOMI") { context.startActivity(Intent(context, EchoActivity::class.java)) }
 
         Spacer(Modifier.height(24.dp))
 

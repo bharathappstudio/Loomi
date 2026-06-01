@@ -60,9 +60,16 @@ class LoomiFirebaseMessagingService : FirebaseMessagingService() {
                     )
                 } else if (type == "sos") {
                     val senderName = data["senderName"] ?: "Someone"
-                    NotificationHelper.showSecurityNotification(
+                    val battery = data["battery"] ?: "N/A"
+                    val lat = data["latitude"]?.toDoubleOrNull() ?: 0.0
+                    val lon = data["longitude"]?.toDoubleOrNull() ?: 0.0
+                    
+                    NotificationHelper.showSOSNotification(
                         applicationContext,
-                        "🚨 SOS ALERT",
+                        senderName,
+                        battery,
+                        lat,
+                        lon
                     )
                 } else {
                     val senderName = data["senderName"] ?: data["title"] ?: "New Message"

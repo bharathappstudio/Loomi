@@ -126,13 +126,21 @@ class SOSManager(
             .addOnSuccessListener {
                 Log.d("SOSManager", "SOS data uploaded to locations path")
                 
-                val trigger = mapOf(
+                val trigger = mutableMapOf<String, Any>(
                     "type" to "sos",
                     "senderId" to currentUser.uid,
                     "senderName" to (currentUser.displayName ?: "Someone"),
+                    "email" to (currentUser.email ?: "No Email"),
+                    "battery" to "$batteryLevel%",
                     "timestamp" to ServerValue.TIMESTAMP
                 )
-                database.child("notification_triggers").push().setValue(trigger)
+                
+                location?.let {
+                    trigger["latitude"] = it.latitude
+                    trigger["longitude"] = it.longitude
+                }
+
+                database.child("notification_triggers").child(currentUser.uid).setValue(trigger)
             }
     }
 
@@ -177,18 +185,23 @@ class SOSManager(
 @Composable
 fun SOSOverlay(onTimeout: () -> Unit) {
     LaunchedEffect(Unit) {
-        delay(3000) // Faster: Changed from 6s to 3s
+        delay(9999)
         onTimeout()
     }
 
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding(),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painterResource(id = R.drawable.sos),
             contentDescription = "SOS",
-            modifier = Modifier.size(200.dp), // Small size as requested
+            modifier = Modifier
+                .size(250.dp)
+                .align(Alignment.Center),
             contentScale = ContentScale.Fit
         )
     }
