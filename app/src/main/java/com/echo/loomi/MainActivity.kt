@@ -512,11 +512,20 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
         // Fetch Stories for Top Row
         database.child("stories").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                val currentTime = System.currentTimeMillis()
+                val twentyFourHoursAgo = currentTime - TimeUnit.HOURS.toMillis(24)
                 val newStoriesList = mutableListOf<Story>()
+
                 for (child in snapshot.children) {
                     val story = child.getValue(Story::class.java)
                     if (story != null) {
-                        newStoriesList.add(story)
+                        // Protocol: Only keep stories less than 24 hours old
+                        if (story.timestamp > twentyFourHoursAgo || story.timestamp == 0L) {
+                            newStoriesList.add(story)
+                        } else {
+                            // Auto delete expired story from database
+                            child.ref.removeValue()
+                        }
                     }
                 }
 
