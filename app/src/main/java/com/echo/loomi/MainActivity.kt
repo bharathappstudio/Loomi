@@ -928,7 +928,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                             HorizontalDivider(
                                                 modifier = Modifier.fillMaxWidth()
                                                     .padding(horizontal = 16.dp),
-                                                thickness = 0.5.dp,
+                                                thickness = 1.dp,
                                                 color = if (isDark) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.onSurface.copy(
                                                     alpha = 0.08f
                                                 )
@@ -1188,13 +1188,13 @@ fun StoryBottomSheet(
 fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
     val isDark = isSystemInDarkTheme()
     Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).drawBehind {
-        val strokeWidth = 0.5.dp.toPx()
+        val strokeWidth = 1.dp.toPx()
         val y = size.height - strokeWidth / 2
-        drawLine(color = if (isDark) Color.White.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.1f), start = Offset(72.dp.toPx(), y), end = Offset(size.width, y), strokeWidth = strokeWidth)
+        drawLine(color = if (isDark) Color.White.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.1f), start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = strokeWidth)
     }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(54.dp).border(width = 2.dp, color = if (isDark) Color.White else (if (user.status == "Online") Color(
             0xFFA5D6A7
-        ) else Color(0xFFFFF59D).copy(alpha = 0.5f)), shape = CircleShape).background(MaterialTheme.colorScheme.surface, CircleShape), contentAlignment = Alignment.Center) {
+        ) else Color(0xFFFFD54F).copy(alpha = 0.5f)), shape = CircleShape).background(MaterialTheme.colorScheme.surface, CircleShape), contentAlignment = Alignment.Center) {
             val context = LocalContext.current
             val imageRequest = remember(user.imageName) {
                 val data: Any = if (user.imageName.startsWith("data:image")) {
