@@ -147,7 +147,7 @@ class MessageActivity : ComponentActivity() {
             LoomiTheme {
                 val sosActive = showSOSOverlay.value
                 val blurValue by animateDpAsState(
-                    targetValue = if (sosActive) 100.dp else 0.dp,
+                    targetValue = if (sosActive) 30.dp else 0.dp,
                     animationSpec = tween(500),
                     label = "sos_blur"
                 )
@@ -345,7 +345,7 @@ fun MessageScreen(
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 if (messagesList.isEmpty()) {
                     Image(
-                        painter = painterResource(id = R.drawable.sos),
+                        painter = painterResource(id = R.drawable.grop_chart),
                         contentDescription = "No messages",
                         modifier = Modifier.size(250.dp),
                         contentScale = ContentScale.Fit

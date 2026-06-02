@@ -318,6 +318,17 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     val usersList = remember { mutableStateListOf<SnapUser>() }
     val storiesList = remember { mutableStateListOf<Story>() }
     var selectedStoryForSheet by remember { mutableStateOf<Story?>(null) }
+    val pullRefreshState = rememberPullToRefreshState()
+    var isStoryReadyToShow by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(selectedStoryForSheet) {
+        if (selectedStoryForSheet != null) {
+            delay(150)
+            isStoryReadyToShow = true
+        } else {
+            isStoryReadyToShow = false
+        }
+    }
     val songUrlCache = remember { mutableStateMapOf<Long, String>() }
 
     var isSearchVisible by remember { mutableStateOf(false) }
@@ -366,7 +377,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     }
 
     val blurProgress by animateFloatAsState(
-        targetValue = if (selectedStoryForSheet != null || isTrulyOffline || isRefreshing) 1f else 0f,
+        targetValue = if (selectedStoryForSheet != null || isTrulyOffline) 1f else 0f,
         animationSpec = tween(200),
         label = "sheet_blur"
     )
@@ -530,6 +541,27 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                 storiesList.add(updatedStory)
                                 storiesList.sortByDescending { it.timestamp }
                             }
+
+                            // Pre-fetch song URL for faster play
+                            if (story.songId != 0L && !songUrlCache.containsKey(story.songId)) {
+                                scope.launch(Dispatchers.IO) {
+                                    try {
+                                        val url = URL("https://itunes.apple.com/lookup?id=${story.songId}")
+                                        val connection = url.openConnection() as HttpURLConnection
+                                        val response = connection.inputStream.bufferedReader().use { it.readText() }
+                                        val json = JSONObject(response)
+                                        val results = json.getJSONArray("results")
+                                        if (results.length() > 0) {
+                                            val pUrl = results.getJSONObject(0).optString("previewUrl")
+                                            if (pUrl.isNotEmpty()) {
+                                                songUrlCache[story.songId] = pUrl
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("PreFetch", "Failed to pre-fetch song", e)
+                                    }
+                                }
+                            }
                         }
                         override fun onCancelled(error: DatabaseError) {}
                     })
@@ -548,7 +580,15 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                 isRefreshing = false
             }
         },
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        state = pullRefreshState,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pullRefreshState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.padding(top = 80.dp).align(Alignment.TopCenter)
+            )
+        }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -932,7 +972,16 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                 )
             }
 
-            if (selectedStoryForSheet != null) {
+            if (selectedStoryForSheet != null && isStoryReadyToShow) {
+                Box(modifier = Modifier.fillMaxSize().zIndex(10f), contentAlignment = Alignment.TopCenter) {
+                    Image(
+                        painter = painterResource(id = R.drawable.share_musik),
+                        contentDescription = "Like",
+                        modifier = Modifier.size(350.dp).padding(top = 90.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+
                 StoryBottomSheet(
                     story = selectedStoryForSheet!!,
                     cache = songUrlCache,
@@ -1017,10 +1066,10 @@ fun StoryBottomSheet(
     }
 
     LaunchedEffect(previewUrl) {
-        previewUrl?.let { url ->
-            try {
+        val url = previewUrl ?: return@LaunchedEffect
+        try {
+            withContext(Dispatchers.IO) {
                 sheetMediaPlayer.apply {
-                    stop()
                     reset()
                     setAudioAttributes(
                         AudioAttributes.Builder()
@@ -1030,12 +1079,12 @@ fun StoryBottomSheet(
                     )
                     setDataSource(url)
                     isLooping = true
-                    prepareAsync()
-                    setOnPreparedListener { start() }
+                    prepare() // prepare() on IO thread is faster to start than prepareAsync() on main
                 }
-            } catch (e: Exception) {
-                Log.e("StorySheet", "Failed to play music in sheet", e)
             }
+            sheetMediaPlayer.start()
+        } catch (e: Exception) {
+            Log.e("StorySheet", "Failed to play music in sheet", e)
         }
     }
 
