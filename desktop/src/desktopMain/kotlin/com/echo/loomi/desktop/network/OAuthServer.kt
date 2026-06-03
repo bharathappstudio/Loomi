@@ -31,82 +31,84 @@ object OAuthServer {
         val errorMessage: String? = null
     )
 
-    suspend fun startGoogleSignIn(onResult: (AuthResult) -> Unit) = withContext(Dispatchers.IO) {
-        var server: HttpServer? = null
-        try {
-            server = HttpServer.create(InetSocketAddress("127.0.0.1", PORT), 0)
-            server.createContext("/callback") { exchange ->
-                val uri = exchange.requestURI
-                val query = uri.query
-                val code = query?.split("&")
-                    ?.firstOrNull { it.startsWith("code=") }
-                    ?.substring(5)
+    suspend fun startGoogleSignIn(onResult: (AuthResult) -> Unit) {
+        withContext(Dispatchers.IO) {
+            var server: HttpServer? = null
+            try {
+                server = HttpServer.create(InetSocketAddress("127.0.0.1", PORT), 0)
+                server.createContext("/callback") { exchange ->
+                    val uri = exchange.requestURI
+                    val query = uri.query
+                    val code = query?.split("&")
+                        ?.firstOrNull { it.startsWith("code=") }
+                        ?.substring(5)
 
-                if (code != null) {
-                    val htmlResponse = """
-                        <html>
-                        <head>
-                            <title>Loomi Login</title>
-                            <style>
-                                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding-top: 100px; background-color: #121212; color: white; }
-                                .container { max-width: 400px; margin: 0 auto; padding: 40px; border-radius: 12px; background-color: #1E1E1E; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-                                h2 { color: #66BB6A; }
-                                p { color: #aaaaaa; }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="container">
-                                <h2>Loomi Login Successful</h2>
-                                <p>You have successfully authenticated with Google. You can safely close this tab now and return to the Loomi app.</p>
-                            </div>
-                        </body>
-                        </html>
-                    """.trimIndent()
-                    
-                    exchange.sendResponseHeaders(200, htmlResponse.toByteArray().size.toLong())
-                    exchange.responseBody.write(htmlResponse.toByteArray())
-                    exchange.responseBody.close()
+                    if (code != null) {
+                        val htmlResponse = """
+                            <html>
+                            <head>
+                                <title>Loomi Login</title>
+                                <style>
+                                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding-top: 100px; background-color: #121212; color: white; }
+                                    .container { max-width: 400px; margin: 0 auto; padding: 40px; border-radius: 12px; background-color: #1E1E1E; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+                                    h2 { color: #66BB6A; }
+                                    p { color: #aaaaaa; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="container">
+                                    <h2>Loomi Login Successful</h2>
+                                    <p>You have successfully authenticated with Google. You can safely close this tab now and return to the Loomi app.</p>
+                                </div>
+                            </body>
+                            </html>
+                        """.trimIndent()
+                        
+                        exchange.sendResponseHeaders(200, htmlResponse.toByteArray().size.toLong())
+                        exchange.responseBody.write(htmlResponse.toByteArray())
+                        exchange.responseBody.close()
 
-                    // Code received, stop the server and complete auth asynchronously
-                    server?.stop(1)
-                    
-                    // Exchange authorization code for tokens
-                    exchangeCodeForTokens(code, onResult)
+                        // Code received, stop the server and complete auth asynchronously
+                        server?.stop(1)
+                        
+                        // Exchange authorization code for tokens
+                        exchangeCodeForTokens(code, onResult)
+                    } else {
+                        val htmlResponse = "<h3>Authorization Failed: Code not found.</h3>"
+                        exchange.sendResponseHeaders(400, htmlResponse.toByteArray().size.toLong())
+                        exchange.responseBody.write(htmlResponse.toByteArray())
+                        exchange.responseBody.close()
+                        server?.stop(1)
+                        onResult(AuthResult(false, errorMessage = "Authorization code not found in callback."))
+                    }
+                }
+
+                server.start()
+
+                // Open user browser
+                val authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
+                        "client_id=$CLIENT_ID" +
+                        "&redirect_uri=$REDIRECT_URI" +
+                        "&response_type=code" +
+                        "&scope=email%20profile%20openid"
+                
+                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                    Desktop.getDesktop().browse(URI(authUrl))
                 } else {
-                    val htmlResponse = "<h3>Authorization Failed: Code not found.</h3>"
-                    exchange.sendResponseHeaders(400, htmlResponse.toByteArray().size.toLong())
-                    exchange.responseBody.write(htmlResponse.toByteArray())
-                    exchange.responseBody.close()
-                    server?.stop(1)
-                    onResult(AuthResult(false, errorMessage = "Authorization code not found in callback."))
+                    // Alternative command execution for browser if Desktop API is not supported on some Linux environments
+                    val runtime = Runtime.getRuntime()
+                    try {
+                        runtime.exec("xdg-open $authUrl")
+                    } catch (e: Exception) {
+                        server.stop(0)
+                        onResult(AuthResult(false, errorMessage = "Could not open system browser. URL: $authUrl"))
+                    }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                server?.stop(0)
+                onResult(AuthResult(false, errorMessage = e.localizedMessage))
             }
-
-            server.start()
-
-            // Open user browser
-            val authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
-                    "client_id=$CLIENT_ID" +
-                    "&redirect_uri=$REDIRECT_URI" +
-                    "&response_type=code" +
-                    "&scope=email%20profile%20openid"
-            
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(URI(authUrl))
-            } else {
-                // Alternative command execution for browser if Desktop API is not supported on some Linux environments
-                val runtime = Runtime.getRuntime()
-                try {
-                    runtime.exec("xdg-open $authUrl")
-                } catch (e: Exception) {
-                    server.stop(0)
-                    onResult(AuthResult(false, errorMessage = "Could not open system browser. URL: $authUrl"))
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            server?.stop(0)
-            onResult(AuthResult(false, errorMessage = e.localizedMessage))
         }
     }
 
