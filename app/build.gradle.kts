@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+// Dummy task to satisfy IDE sync requirement for Gradle 9.x/Kotlin 2.x
+tasks.register("prepareKotlinBuildScriptModel") {}
+
 android {
     namespace = "com.echo.loomi"
     compileSdk = 36
