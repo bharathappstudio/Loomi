@@ -318,6 +318,7 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     val usersList = remember { mutableStateListOf<SnapUser>() }
     val storiesList = remember { mutableStateListOf<Story>() }
     var selectedStoryForSheet by remember { mutableStateOf<Story?>(null) }
+    var longPressedUser by remember { mutableStateOf<SnapUser?>(null) }
     val pullRefreshState = rememberPullToRefreshState()
     var isStoryReadyToShow by remember { mutableStateOf(false) }
     
@@ -366,18 +367,28 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
         label = "search_anim"
     )
 
+    val context = LocalContext.current
+    val pinnedPrefs = remember { context.getSharedPreferences("pinned_users", android.content.Context.MODE_PRIVATE) }
+    var pinnedUids by remember { mutableStateOf(pinnedPrefs.getStringSet("uids", emptySet()) ?: emptySet()) }
+
     val filteredUsersList = remember {
         derivedStateOf {
-            if (searchQuery.isEmpty()) {
-                usersList
+            val list = if (searchQuery.isEmpty()) {
+                usersList.toList()
             } else {
                 usersList.filter { it.name.contains(searchQuery, ignoreCase = true) }
             }
+            list.map { it.copy(isPinned = pinnedUids.contains(it.uid)) }
+                .sortedWith(
+                    compareByDescending<SnapUser> { it.isPinned }
+                        .thenByDescending { it.lastMessageTime }
+                        .thenByDescending { it.status == "Online" }
+                )
         }
     }
 
     val blurProgress by animateFloatAsState(
-        targetValue = if (selectedStoryForSheet != null || isTrulyOffline) 1f else 0f,
+        targetValue = if (selectedStoryForSheet != null || isTrulyOffline || longPressedUser != null) 1f else 0f,
         animationSpec = tween(200),
         label = "sheet_blur"
     )
@@ -396,7 +407,6 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
     val currentUser = FirebaseAuth.getInstance().currentUser
     var currentUserImage by remember { mutableStateOf("") }
     var isLoadingProfile by remember { mutableStateOf(true) }
-    val context = LocalContext.current
 
     val googleColors = listOf(
         Color(0xFF8AB4F8), Color(0xFFF28B82), Color(0xFFFDD663),
@@ -947,6 +957,8 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                                             putExtra("receiverImage", user.imageName)
                                         }
                                     context.startActivity(intent)
+                                }, onLongClick = {
+                                    longPressedUser = user
                                 })
                             }
                         }
@@ -1016,6 +1028,22 @@ fun MainContent(onLogout: () -> Unit, onAddAccount: () -> Unit, onCameraClick: (
                         Spacer(modifier = Modifier.height(20.dp))
                     }
                 }
+            }
+
+            if (longPressedUser != null) {
+                UserActionOverlay(
+                    user = longPressedUser!!,
+                    onPinToggle = { user ->
+                        val newPinned = if (pinnedUids.contains(user.uid)) {
+                            pinnedUids - user.uid
+                        } else {
+                            pinnedUids + user.uid
+                        }
+                        pinnedUids = newPinned
+                        pinnedPrefs.edit().putStringSet("uids", newPinned).apply()
+                    },
+                    onDismiss = { longPressedUser = null }
+                )
             }
         }
     }
@@ -1184,10 +1212,11 @@ fun StoryBottomSheet(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SnapChatItem(user: SnapUser, onClick: () -> Unit) {
+fun SnapChatItem(user: SnapUser, onClick: () -> Unit, onLongClick: () -> Unit) {
     val isDark = isSystemInDarkTheme()
-    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).drawBehind {
+    Row(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick).drawBehind {
         val strokeWidth = 1.dp.toPx()
         val y = size.height - strokeWidth / 2
         drawLine(color = if (isDark) Color.White.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.1f), start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = strokeWidth)
@@ -1272,6 +1301,96 @@ fun FloatingBottomNavBar(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(painterResource(R.drawable.heart), null, tint = iconColor, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun UserActionOverlay(
+    user: SnapUser,
+    onPinToggle: (SnapUser) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    val bgColor = if (isDark) Color(0xFF2C2C2C).copy(alpha = 0.95f) else Color(0xFFFFF8E1).copy(alpha = 0.95f)
+    val textColor = if (isDark) Color.White else Color.Black
+    val dividerColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
+    val borderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.White
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(enabled = true, onClick = onDismiss)
+            .zIndex(20f),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .width(280.dp)
+                .clip(RoundedCornerShape(25.dp))
+                .border(1.dp, borderColor, RoundedCornerShape(25.dp))
+                .background(bgColor)
+                .clickable(enabled = false) { } // Prevent dismiss when clicking the card
+                .padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = user.name,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                modifier = Modifier.padding(vertical = 16.dp),
+                color = textColor
+            )
+            
+            HorizontalDivider(thickness = 1.dp, color = dividerColor)
+            
+            if (!user.isPinned) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPinToggle(user); onDismiss() }
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Pin", fontSize = 16.sp, color = textColor)
+                }
+                HorizontalDivider(thickness = 1.dp, color = dividerColor)
+            }
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onDismiss() }
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Block", color = Color.Red, fontSize = 16.sp)
+            }
+            
+            HorizontalDivider(thickness = 1.dp, color = dividerColor)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onDismiss() }
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Report", color = Color.Red, fontSize = 16.sp)
+            }
+
+            if (user.isPinned) {
+                HorizontalDivider(thickness = 1.dp, color = dividerColor)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPinToggle(user); onDismiss() }
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Unpin", color = Color.Red, fontSize = 16.sp)
+                }
             }
         }
     }
